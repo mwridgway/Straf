@@ -1,8 +1,13 @@
 #include "Straf/Config.h"
 #include <fstream>
 #include <sstream>
-#include <regex>
 #include <stdexcept>
+#if __has_include(<nlohmann/json.hpp>)
+    #include <nlohmann/json.hpp>
+    #define STRAF_HAS_NLOHMANN 1
+#else
+    #include "Straf/MiniJson.h"
+#endif
 
 namespace Straf {
 
@@ -13,54 +18,65 @@ static std::string ReadAll(const std::string& path){
     return ss.str();
 }
 
-static void ParseWords(const std::string& s, std::vector<std::string>& out){
-    // Find words array and extract strings
-    std::smatch m;
-    std::regex wordsArray(R"REGEX("words"\s*:\s*\[(.*?)\])REGEX", std::regex::icase | std::regex::optimize);
-    if(std::regex_search(s, m, wordsArray)){
-        std::string arr = m[1].str();
-        std::regex strRe(R"REGEX("((?:\\"|[^"])*)")REGEX");
-        for(auto it = std::sregex_iterator(arr.begin(), arr.end(), strRe); it != std::sregex_iterator(); ++it){
-            std::string val = (*it)[1].str();
-            // unescape simple escaped quotes
-            val = std::regex_replace(val, std::regex("\\\""), "\"");
-            out.emplace_back(val);
-        }
-    }
-}
-
-static int ParseInt(const std::string& s, const char* key, int fallback){
-    std::regex re(std::string("\"") + key + "\"\\s*:\\s*([0-9]+)");
-    std::smatch m; 
-    if(std::regex_search(s, m, re)) {
-        try {
-            return std::stoi(m[1].str());
-        } catch (const std::exception&) {
-            return fallback;
-        }
-    }
-    return fallback;
-}
-
-static std::string ParseString(const std::string& s, const char* key, const std::string& fallback){
-    std::regex re(std::string("\"") + key + "\"\\s*:\\s*\"([^\"]*)\"");
-    std::smatch m; if(std::regex_search(s, m, re)) return m[1].str();
-    return fallback;
-}
-
 std::optional<AppConfig> LoadConfig(const std::string& path) {
-    std::string text = ReadAll(path);  
+    std::string text = ReadAll(path);
     if (text.empty()) return std::nullopt;
-    AppConfig cfg;
-    ParseWords(text, cfg.words);
 
-    cfg.penalty.durationSeconds = ParseInt(text, "durationSeconds", cfg.penalty.durationSeconds);
-    cfg.penalty.cooldownSeconds = ParseInt(text, "cooldownSeconds", cfg.penalty.cooldownSeconds);
-    cfg.penalty.queueLimit = ParseInt(text, "queueLimit", cfg.penalty.queueLimit);
-    cfg.audio.sampleRate = ParseInt(text, "sampleRate", cfg.audio.sampleRate);
-    cfg.audio.channels = ParseInt(text, "channels", cfg.audio.channels);
-    cfg.logLevel = ParseString(text, "level", cfg.logLevel);
+#ifdef STRAF_HAS_NLOHMANN
+    nlohmann::json j;
+    try { j = nlohmann::json::parse(text); } catch (...) { return std::nullopt; }
+    AppConfig cfg;
+    if (auto it = j.find("words"); it != j.end() && it->is_array()) {
+        for (const auto& w : *it) if (w.is_string()) cfg.words.push_back(w.get<std::string>());
+    }
+    if (auto it = j.find("penalty"); it != j.end() && it->is_object()) {
+        const auto& p = *it;
+        if (p.contains("durationSeconds")) cfg.penalty.durationSeconds = p.value("durationSeconds", cfg.penalty.durationSeconds);
+        if (p.contains("cooldownSeconds")) cfg.penalty.cooldownSeconds = p.value("cooldownSeconds", cfg.penalty.cooldownSeconds);
+        if (p.contains("queueLimit")) cfg.penalty.queueLimit = p.value("queueLimit", cfg.penalty.queueLimit);
+    }
+    if (auto it = j.find("audio"); it != j.end() && it->is_object()) {
+        const auto& a = *it;
+        if (a.contains("sampleRate")) cfg.audio.sampleRate = a.value("sampleRate", cfg.audio.sampleRate);
+        if (a.contains("channels")) cfg.audio.channels = a.value("channels", cfg.audio.channels);
+    }
+    if (auto it = j.find("logging"); it != j.end() && it->is_object()) {
+        cfg.logLevel = it->value("level", cfg.logLevel);
+    } else if (j.contains("level")) {
+        cfg.logLevel = j.value("level", cfg.logLevel);
+    }
     return cfg;
+#else
+    auto rootOpt = MiniJson::Parse(text);
+    if (!rootOpt || !rootOpt->is_object()) return std::nullopt;
+    const auto& root = rootOpt->as_object();
+    AppConfig cfg;
+    // words
+    if (const auto* v = MiniJson::Find(root, "words"); v && v->is_array()){
+        for (const auto& el : v->as_array()) if (el.is_string()) cfg.words.push_back(el.as_string());
+    }
+    // penalty
+    if (const auto* v = MiniJson::Find(root, "penalty"); v && v->is_object()){
+        const auto& p = v->as_object();
+        if (const auto* d = MiniJson::Find(p, "durationSeconds"); d && d->is_number()) cfg.penalty.durationSeconds = static_cast<int>(d->as_number());
+        if (const auto* c = MiniJson::Find(p, "cooldownSeconds"); c && c->is_number()) cfg.penalty.cooldownSeconds = static_cast<int>(c->as_number());
+        if (const auto* q = MiniJson::Find(p, "queueLimit"); q && q->is_number()) cfg.penalty.queueLimit = static_cast<int>(q->as_number());
+    }
+    // audio
+    if (const auto* v = MiniJson::Find(root, "audio"); v && v->is_object()){
+        const auto& a = v->as_object();
+        if (const auto* sr = MiniJson::Find(a, "sampleRate"); sr && sr->is_number()) cfg.audio.sampleRate = static_cast<int>(sr->as_number());
+        if (const auto* ch = MiniJson::Find(a, "channels"); ch && ch->is_number()) cfg.audio.channels = static_cast<int>(ch->as_number());
+    }
+    // logging
+    if (const auto* v = MiniJson::Find(root, "logging"); v && v->is_object()){
+        const auto& l = v->as_object();
+        if (const auto* lev = MiniJson::Find(l, "level"); lev && lev->is_string()) cfg.logLevel = lev->as_string();
+    } else if (const auto* lev = MiniJson::Find(root, "level"); lev && lev->is_string()) {
+        cfg.logLevel = lev->as_string();
+    }
+    return cfg;
+#endif
 }
 
 }

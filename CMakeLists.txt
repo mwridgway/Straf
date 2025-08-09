@@ -14,7 +14,11 @@ if(MSVC)
 endif()
 
 # Optional dependencies (can be enabled via vcpkg or local includes)
-find_path(NLOHMANN_JSON_INCLUDE_DIRS nlohmann/json.hpp PATHS ${CMAKE_SOURCE_DIR}/third_party NO_DEFAULT_PATH)
+# Prefer vcpkg config package when available; otherwise fall back to header include paths.
+if(STRAF_USE_VCPKG)
+  find_package(nlohmann_json CONFIG QUIET)
+endif()
+find_path(NLOHMANN_JSON_INCLUDE_DIRS nlohmann/json.hpp)
 find_path(SPDLOG_INCLUDE_DIRS spdlog/spdlog.h PATHS ${CMAKE_SOURCE_DIR}/third_party NO_DEFAULT_PATH)
 
 # Sources
@@ -29,8 +33,12 @@ add_executable(StrafAgent WIN32
 )
 
 target_include_directories(StrafAgent PRIVATE include)
-if(NLOHMANN_JSON_INCLUDE_DIRS)
+if(nlohmann_json_FOUND)
+  target_link_libraries(StrafAgent PRIVATE nlohmann_json::nlohmann_json)
+elseif(NLOHMANN_JSON_INCLUDE_DIRS)
   target_include_directories(StrafAgent PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
+else()
+  message(WARNING "nlohmann_json not found. Place nlohmann/json.hpp in a discoverable include path (e.g., third_party) or enable vcpkg.")
 endif()
 if(SPDLOG_INCLUDE_DIRS)
   target_include_directories(StrafAgent PRIVATE ${SPDLOG_INCLUDE_DIRS})
