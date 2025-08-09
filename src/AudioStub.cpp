@@ -27,6 +27,8 @@ private:
     std::atomic<bool> stop_{false};
 };
 
-IAudioSource* CreateAudioStub(){ return new AudioStub(); }
+std::unique_ptr<IAudioSource> CreateAudioStub(){ 
+    return std::make_unique<AudioStub>(); 
+}
 
 }

@@ -4,12 +4,19 @@
 #include <cstdio>
 #include <cstdarg>
 #include <string>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
 
 namespace Straf {
 
 static int s_level = 1; // 0=error,1=info
 static HANDLE s_logFile = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION s_logLock;
+static bool s_logInitialized = false;
 
 static void EnsureLogFile(){
     if (s_logFile != INVALID_HANDLE_VALUE) return;
@@ -28,23 +35,63 @@ static void EnsureLogFile(){
 
 void InitLogging(const std::string& level){
     if (level == "error") s_level = 0; else s_level = 1;
-    InitializeCriticalSection(&s_logLock);
+    if (!s_logInitialized) {
+        InitializeCriticalSection(&s_logLock);
+        s_logInitialized = true;
+    }
     EnsureLogFile();
+}
+
+void ShutdownLogging() {
+    if (s_logInitialized) {
+        if (s_logFile != INVALID_HANDLE_VALUE) {
+            CloseHandle(s_logFile);
+            s_logFile = INVALID_HANDLE_VALUE;
+        }
+        DeleteCriticalSection(&s_logLock);
+        s_logInitialized = false;
+    }
+}
+
+static std::string GetTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    struct tm timeinfo;
+    if (localtime_s(&timeinfo, &time_t) != 0) {
+        return "1970-01-01 00:00:00.000"; // fallback on error
+    }
+    
+    std::ostringstream ss;
+    ss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+    ss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+    return ss.str();
 }
 
 static void vlog(const char* tag, const char* fmt, va_list args){
     char buf[1024];
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    OutputDebugStringA(tag);
-    OutputDebugStringA(": ");
-    OutputDebugStringA(buf);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    if (len < 0) return; // Encoding error
+    if (len >= (int)sizeof(buf)) {
+        // Truncated, but continue with what we have
+        buf[sizeof(buf) - 1] = '\0';
+    }
+    
+    std::string timestamp = GetTimestamp();
+    std::string logLine = timestamp + " " + tag + ": " + buf;
+    
+    OutputDebugStringA(logLine.c_str());
     OutputDebugStringA("\n");
 
+    if (!s_logInitialized) return;
+    
     EnterCriticalSection(&s_logLock);
     EnsureLogFile();
     if (s_logFile != INVALID_HANDLE_VALUE){
         DWORD written = 0;
-        std::string line = std::string(tag) + ": " + buf + "\r\n";
+        std::string line = logLine + "\r\n";
         WriteFile(s_logFile, line.data(), (DWORD)line.size(), &written, nullptr);
         FlushFileBuffers(s_logFile);
     }

@@ -15,11 +15,13 @@
 namespace fs = std::filesystem;
 
 namespace Straf {
-// Forward simple factories for stubs
-IAudioSource* CreateAudioStub();
-IDetector* CreateDetectorStub();
-IOverlayRenderer* CreateOverlayStub();
-IPenaltyManager* CreatePenaltyManager(IOverlayRenderer* overlay);
+// Forward declarations for factory functions
+std::unique_ptr<IAudioSource> CreateAudioStub();
+std::unique_ptr<IDetector> CreateDetectorStub();
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
+std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);
+std::optional<AppConfig> LoadConfig(const std::string& path);
+std::optional<AppConfig> LoadConfig(const std::string& path);
 }
 
 static fs::path GetAppDataConfigPath(){
@@ -27,8 +29,14 @@ static fs::path GetAppDataConfigPath(){
     if (SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &path) != S_OK) return {};
     fs::path p(path);
     CoTaskMemFree(path);
+    try {
+        fs::create_directories(p / "Straf");
+    } catch (const std::exception& e) {
+        // Can't use LogError here since logging might not be initialized yet
+        OutputDebugStringA("Failed to create config directory");
+        return {};
+    }
     p /= "Straf";
-    fs::create_directories(p);
     p /= "config.json";
     return p;
 }
@@ -40,7 +48,14 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     fs::path cfgPath = GetAppDataConfigPath();
     if (!fs::exists(cfgPath)) {
         fs::path local = fs::current_path() / "config.sample.json";
-        if (fs::exists(local)) fs::copy_file(local, cfgPath, fs::copy_options::overwrite_existing);
+        if (fs::exists(local)) {
+            try {
+                fs::copy_file(local, cfgPath, fs::copy_options::overwrite_existing);
+            } catch (const std::exception& e) {
+                // LogError not available yet, but continue anyway
+                OutputDebugStringA("Failed to copy config file");
+            }
+        }
     }
 
     auto cfg = LoadConfig(cfgPath.string());
@@ -53,16 +68,22 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     LogInfo("StrafAgent starting...");
 
     // Create components (stubs for now)
-    std::unique_ptr<IOverlayRenderer> overlay(CreateOverlayStub());
-    overlay->Initialize();
+    auto overlay = CreateOverlayStub();
+    if (!overlay->Initialize()) {
+        LogError("Failed to initialize overlay");
+        return 1;
+    }
 
-    std::unique_ptr<IPenaltyManager> penalties(CreatePenaltyManager(overlay.get()));
+    auto penalties = CreatePenaltyManager(overlay.get());
     penalties->Configure(cfg->penalty.queueLimit,
         std::chrono::seconds(cfg->penalty.durationSeconds),
         std::chrono::seconds(cfg->penalty.cooldownSeconds));
 
-    std::unique_ptr<IDetector> detector(CreateDetectorStub());
-    detector->Initialize(cfg->words);
+    auto detector = CreateDetectorStub();
+    if (!detector->Initialize(cfg->words)) {
+        LogError("Failed to initialize detector");
+        return 1;
+    }
 
     detector->Start([&](const DetectionResult& r){
         LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
@@ -89,5 +110,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
 shutdown:
     detector->Stop();
     LogInfo("StrafAgent exiting");
+    ShutdownLogging();
     return 0;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <functional>
 #include <vector>
+#include <memory>
 
 namespace Straf {
 
@@ -14,5 +15,7 @@ public:
     virtual void Start(AudioCallback onAudio) = 0;
     virtual void Stop() = 0;
 };
+
+std::unique_ptr<IAudioSource> CreateAudioStub();
 
 }

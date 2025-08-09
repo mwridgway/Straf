@@ -2,6 +2,7 @@
 #include "Straf/Overlay.h"
 #include "Straf/Logging.h"
 #include <memory>
+#include <queue>
 
 namespace Straf {
 
@@ -70,6 +71,8 @@ private:
     std::chrono::steady_clock::time_point lastEnd_{};
 };
 
-IPenaltyManager* CreatePenaltyManager(IOverlayRenderer* overlay){ return new PenaltyManager(overlay); }
+std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay){ 
+    return std::make_unique<PenaltyManager>(overlay); 
+}
 
 }

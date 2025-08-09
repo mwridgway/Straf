@@ -37,7 +37,8 @@ private:
     std::atomic<bool> stop_{false};
 };
 
-// Factory for now
-IDetector* CreateDetectorStub(){ return new DetectorStub(); }
+std::unique_ptr<IDetector> CreateDetectorStub(){ 
+    return std::make_unique<DetectorStub>(); 
+}
 
 }

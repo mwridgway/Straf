@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
 #include <regex>
+#include <stdexcept>
 
 namespace Straf {
 
@@ -30,7 +31,14 @@ static void ParseWords(const std::string& s, std::vector<std::string>& out){
 
 static int ParseInt(const std::string& s, const char* key, int fallback){
     std::regex re(std::string("\"") + key + "\"\\s*:\\s*([0-9]+)");
-    std::smatch m; if(std::regex_search(s, m, re)) return std::stoi(m[1].str());
+    std::smatch m; 
+    if(std::regex_search(s, m, re)) {
+        try {
+            return std::stoi(m[1].str());
+        } catch (const std::exception&) {
+            return fallback;
+        }
+    }
     return fallback;
 }
 

@@ -3,6 +3,7 @@
 #include <string>
 #include <optional>
 #include <chrono>
+#include <memory>
 
 namespace Straf {
 
@@ -12,6 +13,8 @@ struct Penalty {
     std::chrono::milliseconds cooldown{60000};
 };
 
+class IOverlayRenderer; // Forward declaration
+
 class IPenaltyManager {
 public:
     virtual ~IPenaltyManager() = default;
@@ -19,5 +22,7 @@ public:
     virtual void Trigger(const std::string& reason) = 0;
     virtual void Tick() = 0; // call frequently from main loop
 };
+
+std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);
 
 }

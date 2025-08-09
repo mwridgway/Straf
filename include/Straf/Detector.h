@@ -2,6 +2,7 @@
 #include <string>
 #include <functional>
 #include <vector>
+#include <memory>
 
 namespace Straf {
 
@@ -19,5 +20,7 @@ public:
     virtual void Start(DetectionCallback onDetect) = 0;
     virtual void Stop() = 0;
 };
+
+std::unique_ptr<IDetector> CreateDetectorStub();
 
 }
