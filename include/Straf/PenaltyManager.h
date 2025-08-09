@@ -21,6 +21,8 @@ public:
     virtual void Configure(int queueLimit, std::chrono::milliseconds defaultDuration, std::chrono::milliseconds defaultCooldown) = 0;
     virtual void Trigger(const std::string& reason) = 0;
     virtual void Tick() = 0; // call frequently from main loop
+    // Returns current star count (active+queued, clamped 1..5 when any active/queued)
+    virtual int GetStarCount() const = 0;
 };
 
 std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);

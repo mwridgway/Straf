@@ -85,6 +85,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
         return 1;
     }
 
+    // Ensure initial status is drawn (0 stars -> hidden banner only)
+    overlay->UpdateStatus(penalties->GetStarCount(), "");
+
     detector->Start([&](const DetectionResult& r){
         LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
         penalties->Trigger(r.word);

@@ -1,14 +1,19 @@
-// Minimal D3D11 + DirectComposition overlay (topmost, click-through, no hooks)
+// D3D11 + DirectComposition overlay (topmost, click-through) with Direct2D/DirectWrite rendering
 #include "Straf/Overlay.h"
 #include "Straf/Logging.h"
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <dcomp.h>
+#include <d2d1_1.h>
+#include <d2d1helper.h>
+#include <dwrite.h>
 #include <wrl/client.h>
 #include <atomic>
 #include <thread>
 #include <string>
+#include <mutex>
+#include <cmath>
 
 using Microsoft::WRL::ComPtr;
 
@@ -47,12 +52,22 @@ public:
     }
 
     void ShowPenalty(const std::string& label) override {
-        label_ = label;
+        {
+            std::lock_guard<std::mutex> _lk(stateMutex_);
+            label_ = label;
+            if (starCount_ <= 0) starCount_ = 1; // ensure at least one
+        }
         if (!visible_){
             visible_ = true;
             ShowWindow(hwnd_, SW_SHOWNA);
             startRenderLoop();
         }
+    }
+
+    void UpdateStatus(int stars, const std::string& label) override {
+        std::lock_guard<std::mutex> _lk(stateMutex_);
+        starCount_ = stars;
+        if (!label.empty()) label_ = label;
     }
 
     void Hide() override {
@@ -195,6 +210,9 @@ private:
             return false;
         }
 
+        // Initialize Direct2D/DirectWrite for drawing text and shapes
+        if (!initD2D(backBuf.Get())) return false;
+
         // Connect visual to swap chain
         visual_->SetContent(swapChain_.Get());
         dcompTarget_->SetRoot(visual_.Get());
@@ -220,32 +238,163 @@ private:
     }
 
     void drawFrame(){
-        // Clear to transparent, then draw a semi-transparent banner at top via a second clear using viewport
-        FLOAT clearAll[4] = {0.f, 0.f, 0.f, 0.f}; // fully transparent
-        d3dCtx_->OMSetRenderTargets(1, rtv_.GetAddressOf(), nullptr);
-        d3dCtx_->ClearRenderTargetView(rtv_.Get(), clearAll);
+        // D2D rendering path
+        if (!d2dCtx_) return;
+        D2D1_SIZE_F sz = d2dCtx_->GetSize();
+        d2dCtx_->BeginDraw();
+        d2dCtx_->Clear(D2D1::ColorF(0, 0.0f)); // fully transparent
 
-        // Banner area: set viewport to top 12% of screen
-        ComPtr<ID3D11Texture2D> backBuf;
-        if (SUCCEEDED(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuf)))){
-            D3D11_TEXTURE2D_DESC td{}; backBuf->GetDesc(&td);
-            D3D11_VIEWPORT vp{}; 
-            vp.TopLeftX = 0; vp.TopLeftY = 0; 
-            vp.Width = static_cast<float>(td.Width);
-            vp.Height = static_cast<float>(td.Height) * 0.12f;
-            vp.MinDepth = 0.f; vp.MaxDepth = 1.f;
-            d3dCtx_->RSSetViewports(1, &vp);
-            // Clear viewport with semi-transparent black (premultiplied alpha OK with zero RGB)
-            FLOAT banner[4] = {0.f, 0.f, 0.f, 0.5f};
-            d3dCtx_->ClearRenderTargetView(rtv_.Get(), banner);
+        // Banner rect
+        float bannerHeight = sz.height * 0.22f; // taller banner for text + stars
+        D2D1_RECT_F banner = D2D1::RectF(0.0f, 0.0f, sz.width, bannerHeight);
+        d2dCtx_->FillRectangle(banner, brushBanner_.Get());
+
+        int stars = 0; std::string label;
+        {
+            std::lock_guard<std::mutex> _lk(stateMutex_);
+            stars = starCount_;
+            label = label_;
         }
+        if (stars < 0) stars = 0; if (stars > 5) stars = 5;
+
+        // Draw up to 5 stars
+        float margin = 16.0f;
+        float starRadius = bannerHeight * 0.28f;
+        float cx = margin + starRadius;
+        float cy = banner.top + bannerHeight * 0.58f;
+        for (int i = 0; i < 5; ++i){
+            bool active = i < stars;
+            drawStar(D2D1::Point2F(cx, cy), starRadius, active ? brushStarActive_.Get() : brushStarInactive_.Get(), active);
+            cx += starRadius * 2.2f;
+        }
+
+        // Draw label text "Gestraf" (or provided label)
+        std::wstring text = L"Gestraf";
+        // If a custom label was provided, append it for context
+        if (!label.empty()){
+            text += L"  -  ";
+            int needed = MultiByteToWideChar(CP_UTF8, 0, label.c_str(), -1, nullptr, 0);
+            if (needed > 0){
+                std::wstring wlabel; wlabel.resize(needed - 1);
+                MultiByteToWideChar(CP_UTF8, 0, label.c_str(), -1, wlabel.data(), needed - 1);
+                text += wlabel;
+            }
+        }
+        float textLeft = cx + margin; // after stars
+        if (textLeft < banner.right * 0.35f) textLeft = banner.right * 0.35f; // ensure some space
+        D2D1_RECT_F textRc = D2D1::RectF(textLeft, banner.top + bannerHeight * 0.15f, banner.right - margin, banner.bottom - margin * 0.5f);
+        d2dCtx_->DrawTextW(text.c_str(), static_cast<UINT32>(text.size()), textFormat_.Get(), textRc, brushText_.Get());
+
+        HRESULT hr = d2dCtx_->EndDraw();
+        if (FAILED(hr)){
+            // Try to recover by reinitializing the D2D target
+            ComPtr<ID3D11Texture2D> backBuf;
+            if (SUCCEEDED(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuf)))){
+                initD2D(backBuf.Get());
+            }
+        }
+    }
+
+    bool initD2D(ID3D11Texture2D* backBuffer){
+        // Create D2D factory
+        HRESULT hr;
+        if (!d2dFactory_){
+            D2D1_FACTORY_OPTIONS opts{};
+#if defined(_DEBUG)
+            // opts.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+#endif
+            hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &opts, &d2dFactory_);
+            if (FAILED(hr)) { LogError("D2D1CreateFactory failed: 0x%08X", hr); return false; }
+        }
+
+        // Create DWrite factory
+        if (!dwFactory_){
+            hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), &dwFactory_);
+            if (FAILED(hr)) { LogError("DWriteCreateFactory failed: 0x%08X", hr); return false; }
+        }
+
+        // Get DXGI device and create D2D device/context
+        ComPtr<IDXGIDevice> dxgiDeviceLocal = dxgiDevice_;
+        if (!dxgiDeviceLocal){
+            hr = d3dDevice_.As(&dxgiDeviceLocal);
+            if (FAILED(hr)) return false;
+        }
+        hr = d2dFactory_->CreateDevice(dxgiDeviceLocal.Get(), &d2dDevice_);
+        if (FAILED(hr)) { LogError("ID2D1Factory1::CreateDevice failed: 0x%08X", hr); return false; }
+        hr = d2dDevice_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx_);
+        if (FAILED(hr)) { LogError("ID2D1Device::CreateDeviceContext failed: 0x%08X", hr); return false; }
+
+        // Create D2D target bitmap from swap chain back buffer
+        ComPtr<IDXGISurface> surface;
+        hr = backBuffer->QueryInterface(IID_PPV_ARGS(&surface));
+        if (FAILED(hr)) return false;
+        FLOAT dpiX = 96.0f, dpiY = 96.0f;
+        d2dFactory_->GetDesktopDpi(&dpiX, &dpiY);
+        D2D1_BITMAP_PROPERTIES1 bp = D2D1::BitmapProperties1(
+            D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+            dpiX, dpiY);
+        hr = d2dCtx_->CreateBitmapFromDxgiSurface(surface.Get(), &bp, &d2dTarget_);
+        if (FAILED(hr)) { LogError("CreateBitmapFromDxgiSurface failed: 0x%08X", hr); return false; }
+        d2dCtx_->SetTarget(d2dTarget_.Get());
+
+        // Create brushes
+        D2D1_COLOR_F bannerCol = D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.55f);
+        D2D1_COLOR_F starActive = D2D1::ColorF(D2D1::ColorF::Gold);
+        D2D1_COLOR_F starInactive = D2D1::ColorF(0.4f, 0.4f, 0.4f, 0.7f);
+        D2D1_COLOR_F textCol = D2D1::ColorF(D2D1::ColorF::White);
+        d2dCtx_->CreateSolidColorBrush(bannerCol, &brushBanner_);
+        d2dCtx_->CreateSolidColorBrush(starActive, &brushStarActive_);
+        d2dCtx_->CreateSolidColorBrush(starInactive, &brushStarInactive_);
+        d2dCtx_->CreateSolidColorBrush(textCol, &brushText_);
+
+        // Create text format (try GTA-like font: Pricedown, then Impact, then Arial Black)
+        const wchar_t* fonts[] = { L"Pricedown", L"Impact", L"Arial Black", L"Segoe UI" };
+        HRESULT lastHr = E_FAIL;
+    for (auto f : fonts){
+            lastHr = dwFactory_->CreateTextFormat(
+        f, nullptr, DWRITE_FONT_WEIGHT_EXTRA_BOLD, DWRITE_FONT_STYLE_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL, 48.0f, L"en-us", &textFormat_);
+            if (SUCCEEDED(lastHr)) break;
+        }
+        if (FAILED(lastHr)) { LogError("DWrite CreateTextFormat failed: 0x%08X", lastHr); return false; }
+        textFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        textFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+
+        return true;
+    }
+
+    void drawStar(D2D1_POINT_2F center, float r, ID2D1Brush* brush, bool filled){
+        // 5-point star geometry
+        ComPtr<ID2D1PathGeometry> geo;
+        if (FAILED(d2dFactory_->CreatePathGeometry(&geo))) return;
+        ComPtr<ID2D1GeometrySink> sink;
+        if (FAILED(geo->Open(&sink))) return;
+        const int points = 5;
+        float angleStep = 3.14159265f * 2.0f / points;
+        float startAngle = -3.14159265f / 2.0f;
+        float rInner = r * 0.5f;
+        for (int i = 0; i < points; ++i){
+            float a0 = startAngle + i * angleStep;
+            float a1 = a0 + angleStep / 2.0f;
+            D2D1_POINT_2F p0 = D2D1::Point2F(center.x + r * cosf(a0), center.y + r * sinf(a0));
+            D2D1_POINT_2F p1 = D2D1::Point2F(center.x + rInner * cosf(a1), center.y + rInner * sinf(a1));
+            if (i == 0) sink->BeginFigure(p0, D2D1_FIGURE_BEGIN_FILLED);
+            sink->AddLine(p1);
+        }
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        sink->Close();
+        if (filled) d2dCtx_->FillGeometry(geo.Get(), brush);
+        d2dCtx_->DrawGeometry(geo.Get(), brush, 2.0f);
     }
 
 private:
     HWND hwnd_{};
     std::atomic<bool> visible_{false};
     std::string label_;
+    int starCount_{0};
     bool comInitialized_;
+    std::mutex stateMutex_;
 
     ComPtr<ID3D11Device> d3dDevice_;
     ComPtr<ID3D11DeviceContext> d3dCtx_;
@@ -259,6 +408,18 @@ private:
     ComPtr<IDCompositionVisual> visual_;
 
     std::thread renderThread_;
+
+    // D2D / DWrite
+    ComPtr<ID2D1Factory1> d2dFactory_;
+    ComPtr<ID2D1Device> d2dDevice_;
+    ComPtr<ID2D1DeviceContext> d2dCtx_;
+    ComPtr<ID2D1Bitmap1> d2dTarget_;
+    ComPtr<ID2D1SolidColorBrush> brushBanner_;
+    ComPtr<ID2D1SolidColorBrush> brushStarActive_;
+    ComPtr<ID2D1SolidColorBrush> brushStarInactive_;
+    ComPtr<ID2D1SolidColorBrush> brushText_;
+    ComPtr<IDWriteFactory> dwFactory_;
+    ComPtr<IDWriteTextFormat> textFormat_;
 };
 
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub(){ 

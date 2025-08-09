@@ -8,10 +8,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# MSVC settings
+# Compiler settings
 if(MSVC)
-  add_compile_options(/W4 /permissive-)
-  add_definitions(-DUNICODE -D_UNICODE)
+  add_compile_options(/W4 /permissive- /MP /EHsc)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # Optional dependencies (can be enabled via vcpkg or local includes)
@@ -32,6 +33,9 @@ add_executable(StrafAgent WIN32
   src/AudioStub.cpp
   src/PenaltyManager.cpp
 )
+
+# Target-level defines
+target_compile_definitions(StrafAgent PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
 
 # Optional static analysis with clang-tidy (when enabled and found)
 if(STRAF_ENABLE_CLANG_TIDY)
@@ -62,6 +66,8 @@ if(WIN32)
     dxgi
     d3d11
     dcomp
+  d2d1
+  dwrite
   ole32
   shell32
   )

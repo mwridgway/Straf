@@ -25,6 +25,7 @@ public:
             if ((int)queue_.size() < queueLimit_) {
                 queue_.push(Penalty{reason, defaultDuration_, defaultCooldown_});
                 LogInfo("Penalty queued: %s (queue=%zu)", reason.c_str(), queue_.size());
+                overlay_->UpdateStatus(GetStarCount(), reason);
             } else {
                 LogInfo("Penalty dropped (queue full)");
             }
@@ -34,6 +35,7 @@ public:
         current_ = Penalty{reason, defaultDuration_, defaultCooldown_};
         start_ = now;
         overlay_->ShowPenalty(reason);
+        overlay_->UpdateStatus(GetStarCount(), reason);
         LogInfo("Penalty started: %s", reason.c_str());
     }
 
@@ -46,6 +48,7 @@ public:
                 lastEnd_ = now;
                 current_.reset();
                 LogInfo("Penalty ended");
+                overlay_->UpdateStatus(GetStarCount(), "");
             }
             return;
         }
@@ -55,8 +58,18 @@ public:
             queue_.pop();
             start_ = now;
             overlay_->ShowPenalty(current_->label);
+            overlay_->UpdateStatus(GetStarCount(), current_->label);
             LogInfo("Penalty started from queue: %s (remaining=%zu)", current_->label.c_str(), queue_.size());
         }
+    }
+
+    int GetStarCount() const override {
+        int active = current_.has_value() ? 1 : 0;
+        int queued = static_cast<int>(queue_.size());
+        int total = active + queued;
+        if (total <= 0) return 0;
+        if (total > 5) return 5;
+        return total;
     }
 
 private:
