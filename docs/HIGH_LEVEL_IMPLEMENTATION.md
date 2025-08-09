@@ -74,7 +74,7 @@ This document outlines how to implement the app described in `README.md`: listen
 ## Tech Choices (proposed)
 - Build: CMake, vcpkg (optional) for dependencies.
 - Audio: WASAPI (IMMDeviceEnumerator, IAudioClient3, IAudioCaptureClient).
-- Rendering: Direct2D (simple) or Direct3D11 (future-proof for effects).
+- Rendering: Direct3D11 (future‑proof for effects), compliant with CS2, VAC, and Trusted Mode. No process injection or Present hooks.
 - ASR/KWS: Prefer Vosk (C++) for fully offline; abstract behind `IDetector` interface so we can swap to Microsoft Speech SDK.
 
 ## MVP Definition
@@ -84,8 +84,18 @@ This document outlines how to implement the app described in `README.md`: listen
 
 ## Open Decisions (to confirm)
 - ASR engine choice (Vosk vs Microsoft Speech SDK).
-- Overlay tech (D2D vs D3D11) and exact GTA-style visual design.
+  - Decision: Use Vosk (free, offline). Keep swappable via `IDetector`.
 - Default durations/cooldown values and queue limit (README says up to 5; confirm durations).
+  - Decision: Make configurable. Ship sensible defaults (e.g., duration 10s, cooldown 60s, queue limit 5). “GTA‑style” refers to visuals, not timings.
+
+## Rendering technical note
+Use D3D11 (+ DirectComposition for window presentation) without injection or hooks.
+
+- CS2 uses D3D11 on Windows. A D3D11 overlay aligns with the game’s swap chain and minimizes CPU overhead.
+- For text, use DirectWrite/Direct2D on a shared D3D11 surface; present via D3D11. This keeps D3D11 performance with D2D ergonomics.
+- Avoid Present hooks or DLL injection; these can violate VAC/Trusted Mode policies. Use a separate, topmost, click‑through, layered window presented via DirectComposition. Prefer borderless‑windowed mode for games.
+- Anti‑cheat posture: Stay out of game processes. Consider a “game‑safe mode” that disables overlay for known anti‑cheat titles. No guarantees for ESEA or FACEIT; document limitations.
+
 
 ## Next Steps
 - Confirm open decisions and tweak scope.

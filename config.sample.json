@@ -1,0 +1,15 @@
+{
+  "words": ["example"],
+  "penalty": {
+    "durationSeconds": 10,
+    "cooldownSeconds": 60,
+    "queueLimit": 5
+  },
+  "logging": {
+    "level": "info"
+  },
+  "audio": {
+    "sampleRate": 16000,
+    "channels": 1
+  }
+}
