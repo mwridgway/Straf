@@ -3,6 +3,7 @@ project(Straf LANGUAGES CXX)
 
 # Options
 option(STRAF_USE_VCPKG "Use vcpkg for dependencies" ON)
+option(STRAF_ENABLE_CLANG_TIDY "Run clang-tidy during builds (if available)" OFF)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -31,6 +32,16 @@ add_executable(StrafAgent WIN32
   src/AudioStub.cpp
   src/PenaltyManager.cpp
 )
+
+# Optional static analysis with clang-tidy (when enabled and found)
+if(STRAF_ENABLE_CLANG_TIDY)
+  find_program(CLANG_TIDY_EXE NAMES clang-tidy)
+  if(CLANG_TIDY_EXE)
+    set_target_properties(StrafAgent PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+  else()
+    message(WARNING "STRAF_ENABLE_CLANG_TIDY=ON but clang-tidy was not found.")
+  endif()
+endif()
 
 target_include_directories(StrafAgent PRIVATE include)
 if(nlohmann_json_FOUND)

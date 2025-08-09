@@ -1,0 +1,14 @@
+Checks: '-*,bugprone-*,performance-*,portability-*,readability-*,modernize-*,cppcoreguidelines-avoid-c-arrays,cppcoreguidelines-avoid-goto,cppcoreguidelines-avoid-magic-numbers,cppcoreguidelines-interfaces-global-init,cppcoreguidelines-narrowing-conversions,cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory,cppcoreguidelines-pro-bounds-array-to-pointer-decay,cppcoreguidelines-pro-bounds-constant-array-index,cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-slicing,hicpp-exception-baseclass,hicpp-multiway-paths-covered,hicpp-no-assembler,hicpp-no-array-decay,hicpp-use-auto,misc-*,clang-analyzer-*,clang-diagnostic-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(include|src)/.*'
+FormatStyle: none
+UseColor: true
+CheckOptions:
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: _
+  - key: readability-implicit-bool-conversion.AllowIntegerConditions
+    value: '1'
