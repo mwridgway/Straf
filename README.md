@@ -21,6 +21,17 @@ Dependencies:
 	- Alternate: drop single header `nlohmann/json.hpp` into your include path
 	- Note: The project also has a small built-in fallback parser for basic configs, so it will build without nlohmann-json, but nlohmann-json is preferred.
 
+	### Default build (quick start)
+
+	If you just want a standard Debug build with MSVC:
+
+	```powershell
+	cmake -S . -B build
+	cmake --build build --config Debug
+	```
+
+	Artifacts: `build/Debug/StrafAgent.exe`.
+
 ### Option A: Build with vcpkg (recommended)
 
 1) Install vcpkg (one time):
@@ -84,6 +95,34 @@ cmake --build --preset vs2022-debug-tidy --config Debug
 ## Running
 
 On first run, a config file is created at `%AppData%\Straf\config.json` (copied from `config.sample.json` if missing). Edit it to set your words, penalty timings, and logging level.
+
+Quick run after a Debug build (from repo root):
+
+```powershell
+./build/Debug/StrafAgent.exe
+```
+
+### View logs
+
+Logs are written to `%LocalAppData%\Straf\logs\StrafAgent.log`.
+
+- Open the log folder:
+
+```powershell
+Start-Process $env:LOCALAPPDATA\Straf\logs
+```
+
+- Tail the log in real time:
+
+```powershell
+Get-Content -Path "$env:LOCALAPPDATA\Straf\logs\StrafAgent.log" -Wait -Tail 100
+```
+
+- Filter for errors/warnings while tailing:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\Straf\logs\StrafAgent.log" -Wait | Select-String -Pattern 'ERROR|WARN'
+```
 
 ## Features
 

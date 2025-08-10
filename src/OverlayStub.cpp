@@ -19,6 +19,12 @@ using Microsoft::WRL::ComPtr;
 
 namespace Straf {
 
+// Returns true if the given environment variable is set to any value
+static bool IsEnvSetA(const char* name){
+    char buf[2]{};
+    return GetEnvironmentVariableA(name, buf, static_cast<DWORD>(std::size(buf))) > 0;
+}
+
 static LRESULT CALLBACK OverlayWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam){
     switch(msg){
         case WM_NCHITTEST:
@@ -35,6 +41,8 @@ public:
     OverlayD3D11() : comInitialized_(false) {}
 
     bool Initialize() override {
+        // Enable safe debug mode (smaller window) when requested
+        safeDebug_ = IsEnvSetA("STRAF_OVERLAY_SAFE_DEBUG");
         HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (SUCCEEDED(hr)) {
             comInitialized_ = true;
@@ -96,13 +104,20 @@ private:
     }
 
     bool createWindow(){
-        int cx = GetSystemMetrics(SM_CXSCREEN);
-        int cy = GetSystemMetrics(SM_CYSCREEN);
+        int screenCx = GetSystemMetrics(SM_CXSCREEN);
+        int screenCy = GetSystemMetrics(SM_CYSCREEN);
+        // Default full-screen overlay; in safe debug, use a small bar in the top-right
+        int cx = safeDebug_ ? 900 : screenCx;
+        int cy = safeDebug_ ? 180 : screenCy;
+        int x = safeDebug_ ? (screenCx - cx - 20) : 0;
+        int y = safeDebug_ ? 20 : 0;
+
+        DWORD exStyle = WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
         hwnd_ = CreateWindowExW(
-            WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
+            exStyle,
             L"StrafOverlayWindow", L"StrafOverlay",
             WS_POPUP,
-            0, 0, cx, cy,
+            x, y, cx, cy,
             nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (!hwnd_) {
             LogError("Overlay window creation failed: %lu", GetLastError());
@@ -394,6 +409,7 @@ private:
     std::string label_;
     int starCount_{0};
     bool comInitialized_;
+    bool safeDebug_{false};
     std::mutex stateMutex_;
 
     ComPtr<ID3D11Device> d3dDevice_;
@@ -422,7 +438,20 @@ private:
     ComPtr<IDWriteTextFormat> textFormat_;
 };
 
+class OverlayNoop : public IOverlayRenderer {
+public:
+    bool Initialize() override { return true; }
+    void ShowPenalty(const std::string&) override {}
+    void UpdateStatus(int, const std::string&) override {}
+    void Hide() override {}
+};
+
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub(){ 
+    // Allow disabling overlay completely via env var (useful for tests)
+    if (IsEnvSetA("STRAF_NO_OVERLAY")) {
+        LogInfo("Using no-op overlay (STRAF_NO_OVERLAY set)");
+        return std::make_unique<OverlayNoop>();
+    }
     return std::make_unique<OverlayD3D11>(); 
 }
 

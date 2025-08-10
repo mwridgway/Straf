@@ -107,7 +107,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
             penalties->Tick();
             lastTick = now;
         }
-        Sleep(10);
+        Sleep(5);
     }
 
 shutdown:
