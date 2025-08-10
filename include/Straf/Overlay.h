@@ -14,6 +14,13 @@ public:
     virtual void Hide() = 0;
 };
 
+// Factory functions for pluggable overlays
+// Classic: existing GTA-like stars banner
+std::unique_ptr<IOverlayRenderer> CreateOverlayClassic();
+// Bar: alternative style (bottom bar with status)
+std::unique_ptr<IOverlayRenderer> CreateOverlayBar();
+// Default selection based on environment (STRAF_NO_OVERLAY, STRAF_OVERLAY_STYLE)
+// STRAF_OVERLAY_STYLE: "classic" (default) or "bar"
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
 
 }

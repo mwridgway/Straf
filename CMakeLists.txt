@@ -29,7 +29,8 @@ add_executable(StrafAgent WIN32
   src/Config.cpp
   src/Logging.cpp
   src/DetectorStub.cpp
-  src/OverlayStub.cpp
+  src/OverlayClassic.cpp
+  src/OverlayBar.cpp
   src/AudioStub.cpp
   src/PenaltyManager.cpp
 )

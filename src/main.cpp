@@ -87,7 +87,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     InitLogging(cfg->logLevel);
     LogInfo("StrafAgent starting...");
 
-    // Create components (stubs for now)
+    // Create overlay (style selected via STRAF_OVERLAY_STYLE, or default classic)
     auto overlay = CreateOverlayStub();
     if (!overlay->Initialize()) {
         LogError("Failed to initialize overlay");
