@@ -63,6 +63,24 @@ cmake --build build --config Debug
 
 Artifacts will be under `build/Debug/StrafAgent.exe` (for Debug config).
 
+### Enable clang-tidy (optional)
+
+If you have clang-tidy installed, you can run it automatically during builds.
+
+- One-off configure flag:
+
+```powershell
+cmake -S . -B build -DSTRAF_ENABLE_CLANG_TIDY=ON
+cmake --build build --config Debug
+```
+
+- Or use the provided CMake Preset (separate build dir `build-tidy`):
+
+```powershell
+cmake --preset vs2022-debug-tidy
+cmake --build --preset vs2022-debug-tidy --config Debug
+```
+
 ## Running
 
 On first run, a config file is created at `%AppData%\Straf\config.json` (copied from `config.sample.json` if missing). Edit it to set your words, penalty timings, and logging level.
