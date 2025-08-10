@@ -32,6 +32,7 @@ add_executable(StrafAgent WIN32
   src/OverlayClassic.cpp
   src/OverlayBar.cpp
   src/AudioStub.cpp
+  src/AudioWasapi.cpp
   src/PenaltyManager.cpp
 )
 
@@ -64,6 +65,9 @@ endif()
 if(WIN32)
   target_link_libraries(StrafAgent PRIVATE
     winmm
+  mmdevapi
+  uuid
+  uuid
     dxgi
     d3d11
     dcomp

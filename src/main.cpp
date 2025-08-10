@@ -49,10 +49,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     // - STRAF_USE_SAMPLE_CONFIG: if set, use config.sample.json from the repo folder
     fs::path cfgPath;
     // STRAF_CONFIG_PATH (wide env)
-    DWORD need = GetEnvironmentVariableW(L"STRAF_CONFIG_PATH", nullptr, 0);
-    if (need > 0) {
-        std::wstring w; w.resize(need - 1);
-        if (GetEnvironmentVariableW(L"STRAF_CONFIG_PATH", w.data(), need) == need - 1) {
+    DWORD configPathEnv = GetEnvironmentVariableW(L"STRAF_CONFIG_PATH", nullptr, 0);
+    if (configPathEnv > 0) {
+        std::wstring w; w.resize(configPathEnv - 1);
+        if (GetEnvironmentVariableW(L"STRAF_CONFIG_PATH", w.data(), configPathEnv) == configPathEnv - 1) {
             cfgPath = fs::path(w);
         }
     }
@@ -105,6 +105,28 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
         return 1;
     }
 
+    // Audio source selection (for future STT). Use STRAF_AUDIO_SOURCE=wasapi to enable real mic capture.
+    std::unique_ptr<IAudioSource> audio;
+    {
+        DWORD audioSourceEnv = GetEnvironmentVariableW(L"STRAF_AUDIO_SOURCE", nullptr, 0);
+        std::wstring src;
+        if (audioSourceEnv > 0){ src.resize(audioSourceEnv - 1); GetEnvironmentVariableW(L"STRAF_AUDIO_SOURCE", src.data(), audioSourceEnv); }
+        if (_wcsicmp(src.c_str(), L"wasapi") == 0){
+            audio = CreateAudioWasapi();
+            LogInfo("Audio source: WASAPI mic");
+        } else {
+            audio = CreateAudioStub();
+            LogInfo("Audio source: stub");
+        }
+        if (!audio->Initialize(16000, 1)){
+            LogError("Audio initialize failed; falling back to stub");
+            audio = CreateAudioStub();
+            audio->Initialize(16000, 1);
+        }
+        // Start audio with a lightweight no-op callback for now. This primes the pipeline for upcoming STT.
+        audio->Start([](const AudioBuffer&){ /* intentionally no-op */ });
+    }
+
     // Ensure initial status is drawn (0 stars -> hidden banner only)
     overlay->UpdateStatus(penalties->GetStarCount(), "");
 
@@ -131,6 +153,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     }
 
 shutdown:
+    if (audio) audio->Stop();
     detector->Stop();
     LogInfo("StrafAgent exiting");
     ShutdownLogging();
