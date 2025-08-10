@@ -32,6 +32,8 @@ add_executable(StrafAgent WIN32
   src/OverlayClassic.cpp
   src/OverlayBar.cpp
   src/AudioStub.cpp
+    src/STTStub.cpp
+    src/STTSapi.cpp
   src/AudioWasapi.cpp
   src/PenaltyManager.cpp
 )
@@ -67,6 +69,7 @@ if(WIN32)
     winmm
   mmdevapi
   uuid
+    sapi
   uuid
     dxgi
     d3d11

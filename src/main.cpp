@@ -4,6 +4,7 @@
 #include "Straf/Audio.h"
 #include "Straf/Overlay.h"
 #include "Straf/PenaltyManager.h"
+#include "Straf/STT.h"
 // #include "Straf/ConfigLoader.h" // Removed because the file does not exist; ensure LoadConfig is declared in one of the included headers
 #include <windows.h>
 #include <shlobj.h>
@@ -11,6 +12,7 @@
 #include <memory>
 #include <thread>
 #include <chrono>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -127,6 +129,53 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
         audio->Start([](const AudioBuffer&){ /* intentionally no-op */ });
     }
 
+    // STT: choose transcriber (STRAF_STT=sapi|stub). Tokens will be matched to configured words.
+    std::unique_ptr<ITranscriber> stt;
+    {
+        DWORD need = GetEnvironmentVariableW(L"STRAF_STT", nullptr, 0);
+        std::wstring t;
+        if (need > 0){ t.resize(need - 1); GetEnvironmentVariableW(L"STRAF_STT", t.data(), need); }
+        if (_wcsicmp(t.c_str(), L"sapi") == 0){
+            stt = CreateTranscriberSapi();
+            LogInfo("STT: SAPI");
+        } else {
+            stt = CreateTranscriberStub();
+            LogInfo("STT: stub");
+        }
+        // Provide vocabulary (for constrained matching in STT if supported)
+        std::vector<std::string> sttVocab = cfg->words;
+        for (auto& w : sttVocab){
+            std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        }
+        if (!stt->Initialize(sttVocab)){
+            LogError("STT initialize failed; falling back to stub");
+            stt = CreateTranscriberStub();
+            stt->Initialize(sttVocab);
+        }
+    }
+
+    // Bridge STT tokens to detector callback directly for now.
+    DetectionCallback onDetect = [&](const DetectionResult& r){
+        LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
+        penalties->Trigger(r.word);
+    };
+
+    // Build a case-insensitive vocabulary set for matching
+    std::unordered_set<std::string> vocabSet;
+    for (auto w : cfg->words){
+        std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        vocabSet.insert(std::move(w));
+    }
+    stt->Start([onDetect, vocabSet = std::move(vocabSet)](const std::string& token, float conf){
+        std::string t = token;
+        std::transform(t.begin(), t.end(), t.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        // Log every recognized token
+        LogInfo("Recognized: %s (%.2f)", t.c_str(), conf);
+        if (vocabSet.find(t) != vocabSet.end()){
+            onDetect(DetectionResult{t, conf});
+        }
+    });
+
     // Ensure initial status is drawn (0 stars -> hidden banner only)
     overlay->UpdateStatus(penalties->GetStarCount(), "");
 
@@ -153,6 +202,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     }
 
 shutdown:
+    if (stt) stt->Stop();
     if (audio) audio->Stop();
     detector->Stop();
     LogInfo("StrafAgent exiting");
