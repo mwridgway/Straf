@@ -44,23 +44,43 @@ static fs::path GetAppDataConfigPath(){
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     using namespace Straf;
 
-    // Load config (AppData fallback to sample next to exe)
-    fs::path cfgPath = GetAppDataConfigPath();
-    if (!fs::exists(cfgPath)) {
-        fs::path local = fs::current_path() / "config.sample.json";
-        if (fs::exists(local)) {
-            try {
-                fs::copy_file(local, cfgPath, fs::copy_options::overwrite_existing);
-            } catch (const std::exception& e) {
-                // LogError not available yet, but continue anyway
-                OutputDebugStringA("Failed to copy config file");
+    // Load config with overrides:
+    // - STRAF_CONFIG_PATH: absolute path to a config file to load directly
+    // - STRAF_USE_SAMPLE_CONFIG: if set, use config.sample.json from the repo folder
+    fs::path cfgPath;
+    // STRAF_CONFIG_PATH (wide env)
+    DWORD need = GetEnvironmentVariableW(L"STRAF_CONFIG_PATH", nullptr, 0);
+    if (need > 0) {
+        std::wstring w; w.resize(need - 1);
+        if (GetEnvironmentVariableW(L"STRAF_CONFIG_PATH", w.data(), need) == need - 1) {
+            cfgPath = fs::path(w);
+        }
+    }
+    // STRAF_USE_SAMPLE_CONFIG fallback
+    if (cfgPath.empty()){
+        if (GetEnvironmentVariableW(L"STRAF_USE_SAMPLE_CONFIG", nullptr, 0) > 0) {
+            cfgPath = fs::current_path() / "config.sample.json";
+        }
+    }
+    // Default to %AppData%\Straf\config.json, copying sample if missing
+    if (cfgPath.empty()){
+        cfgPath = GetAppDataConfigPath();
+        if (!fs::exists(cfgPath)) {
+            fs::path local = fs::current_path() / "config.sample.json";
+            if (fs::exists(local)) {
+                try {
+                    fs::copy_file(local, cfgPath, fs::copy_options::overwrite_existing);
+                } catch (const std::exception&) {
+                    // LogError not available yet, but continue anyway
+                    OutputDebugStringA("Failed to copy config file");
+                }
             }
         }
     }
 
     auto cfg = LoadConfig(cfgPath.string());
     if (!cfg){
-        MessageBoxW(nullptr, L"Failed to load config.json", L"Straf", MB_OK | MB_ICONERROR);
+        MessageBoxW(nullptr, L"Failed to load configuration file", L"Straf", MB_OK | MB_ICONERROR);
         return 1;
     }
 

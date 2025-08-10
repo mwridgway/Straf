@@ -11,8 +11,22 @@ struct DetectionResult {
     float confidence{1.0f};
 };
 
+/**
+ * @brief Alias for a callback function that handles detection results.
+ *
+ * This type defines a callback function that takes a constant reference to a DetectionResult
+ * and returns void. It is typically used to notify clients when a detection event occurs.
+ */
 using DetectionCallback = std::function<void(const DetectionResult&)>;
 
+/**
+ * @brief Interface for a detection engine.
+ *
+ * This interface defines the contract for a detection engine, requiring implementations to provide 
+ * methods for initialization with a vocabulary, starting detection with a callback, and stopping 
+ * the detection process. It ensures extensibility by using pure virtual functions and includes a 
+ * virtual destructor for proper cleanup.
+ */
 class IDetector {
 public:
     virtual ~IDetector() = default;
