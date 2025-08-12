@@ -138,6 +138,9 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
         if (_wcsicmp(t.c_str(), L"sapi") == 0){
             stt = CreateTranscriberSapi();
             LogInfo("STT: SAPI");
+        } else if (_wcsicmp(t.c_str(), L"vosk") == 0){
+            stt = CreateTranscriberVosk();
+            LogInfo("STT: Vosk");
         } else {
             stt = CreateTranscriberStub();
             LogInfo("STT: stub");

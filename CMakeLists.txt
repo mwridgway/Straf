@@ -4,6 +4,7 @@ project(Straf LANGUAGES CXX)
 # Options
 option(STRAF_USE_VCPKG "Use vcpkg for dependencies" ON)
 option(STRAF_ENABLE_CLANG_TIDY "Run clang-tidy during builds (if available)" OFF)
+option(STRAF_ENABLE_VOSK "Enable Vosk STT backend" OFF)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -32,11 +33,27 @@ add_executable(StrafAgent WIN32
   src/OverlayClassic.cpp
   src/OverlayBar.cpp
   src/AudioStub.cpp
-    src/STTStub.cpp
-    src/STTSapi.cpp
+  src/STTStub.cpp
+  src/STTSapi.cpp
   src/AudioWasapi.cpp
   src/PenaltyManager.cpp
 )
+
+# Optional Vosk backend
+if(STRAF_ENABLE_VOSK)
+  target_sources(StrafAgent PRIVATE src/STTVosk.cpp)
+  if(DEFINED ENV{VOSK_INCLUDE_DIR})
+    target_include_directories(StrafAgent PRIVATE $ENV{VOSK_INCLUDE_DIR})
+  endif()
+  if(DEFINED ENV{VOSK_LIBRARY})
+    target_link_libraries(StrafAgent PRIVATE $ENV{VOSK_LIBRARY})
+  else()
+    target_link_libraries(StrafAgent PRIVATE vosk)
+  endif()
+else()
+  # Provide a stub factory so CreateTranscriberVosk() links even without Vosk
+  target_sources(StrafAgent PRIVATE src/STTVoskStub.cpp)
+endif()
 
 # Target-level defines
 target_compile_definitions(StrafAgent PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -69,8 +86,7 @@ if(WIN32)
     winmm
   mmdevapi
   uuid
-    sapi
-  uuid
+  sapi
     dxgi
     d3d11
     dcomp

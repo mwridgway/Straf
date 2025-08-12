@@ -20,5 +20,6 @@ public:
 // Implementations
 std::unique_ptr<ITranscriber> CreateTranscriberStub();
 std::unique_ptr<ITranscriber> CreateTranscriberSapi();
+std::unique_ptr<ITranscriber> CreateTranscriberVosk();
 
 }
