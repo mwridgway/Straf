@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "cmake: configure vs2022-debug",
+      "type": "shell",
+      "command": "cmake --preset vs2022-debug",
+      "problemMatcher": []
+    },
+    {
+      "label": "cmake: build vs2022-debug",
+      "type": "shell",
+      "command": "cmake --build --preset vs2022-debug",
+      "dependsOn": "cmake: configure vs2022-debug",
+      "problemMatcher": []
+    },
+    {
+      "label": "cmake: configure vs2022-debug-vosk",
+      "type": "shell",
+      "command": "cmake --preset vs2022-debug-vosk",
+      "problemMatcher": []
+    },
+    {
+      "label": "cmake: build vs2022-debug-vosk",
+      "type": "shell",
+      "command": "cmake --build --preset vs2022-debug-vosk",
+      "dependsOn": "cmake: configure vs2022-debug-vosk",
+      "problemMatcher": []
+    }
+  ]
+}

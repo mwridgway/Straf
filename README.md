@@ -26,7 +26,7 @@ Optional:
 	- Build flag: `-DSTRAF_ENABLE_VOSK=ON`
 	- Provide include/lib via env vars or system paths:
 		- `VOSK_INCLUDE_DIR` (folder containing `vosk_api.h`)
-		- `VOSK_LIBRARY` (full path to vosk library, e.g., `C:\path\to\vosk.lib`)
+		- `VOSK_LIBRARY` (full path to vosk library, e.g., `C:\path\to\libvosk.lib`)
 
 	### Default build (quick start)
 
@@ -87,7 +87,7 @@ Artifacts will be under `build/Debug/StrafAgent.exe` (for Debug config).
 cmake -S . -B build -DSTRAF_ENABLE_VOSK=ON
 # If not in default paths, point to Vosk include/lib
 $env:VOSK_INCLUDE_DIR = 'C:\path\to\vosk\include'
-$env:VOSK_LIBRARY = 'C:\path\to\vosk\lib\vosk.lib'
+$env:VOSK_LIBRARY = 'C:\path\to\vosk\lib\libvosk.lib'
 cmake --build build --config Debug
 ```
 
@@ -107,7 +107,7 @@ Vosk is an offline speech-to-text engine. To use it here, you need the SDK (head
 - Option A: Prebuilt Windows binaries (recommended). Unzip somewhere like `C:\tools\vosk`.
 	- Ensure you have:
 		- `C:\tools\vosk\include\vosk_api.h`
-		- `C:\tools\vosk\lib\vosk.lib`
+		- `C:\tools\vosk\lib\libvosk.lib`
 		- `C:\tools\vosk\bin\vosk.dll`
 - Option B: Build from source (if you need a custom build). Build the C API and produce the same artifacts.
 
@@ -120,7 +120,7 @@ Vosk is an offline speech-to-text engine. To use it here, you need the SDK (head
 ```powershell
 # Point CMake to the SDK
 $env:VOSK_INCLUDE_DIR = 'C:\tools\vosk\include'
-$env:VOSK_LIBRARY     = 'C:\tools\vosk\lib\vosk.lib'
+$env:VOSK_LIBRARY     = 'C:\tools\vosk\lib\libvosk.lib'
 
 # Runtime needs vosk.dll on PATH (or copy next to StrafAgent.exe)
 $env:PATH = "C:\tools\vosk\bin;$env:PATH"
@@ -146,7 +146,7 @@ Troubleshooting
 - Build error: `Cannot open include file: 'vosk_api.h'`
 	- Set `VOSK_INCLUDE_DIR` to the folder containing `vosk_api.h`.
 - Link error: `unresolved external symbol` for Vosk
-	- Set `VOSK_LIBRARY` to the full path to `vosk.lib`.
+	- Set `VOSK_LIBRARY` to the full path to `libvosk.lib`.
 - Runtime error: `The code execution cannot proceed because vosk.dll was not found`
 	- Add the SDK `bin` folder to `PATH`, or copy `vosk.dll` next to `StrafAgent.exe`.
 - No words recognized or very slow

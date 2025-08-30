@@ -4,6 +4,7 @@
 #include "Straf/Audio.h"
 #include "Straf/Overlay.h"
 #include "Straf/PenaltyManager.h"
+#include "Straf/Tray.h"
 #include "Straf/STT.h"
 // #include "Straf/ConfigLoader.h" // Removed because the file does not exist; ensure LoadConfig is declared in one of the included headers
 #include <windows.h>
@@ -45,6 +46,12 @@ static fs::path GetAppDataConfigPath(){
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     using namespace Straf;
+    // System tray icon with exit option
+    auto tray = CreateTray();
+    tray->Run([]{
+        LogInfo("Tray exit requested, shutting down.");
+        PostQuitMessage(0);
+    });
 
     // Load config with overrides:
     // - STRAF_CONFIG_PATH: absolute path to a config file to load directly

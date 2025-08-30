@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "StrafAgent (Debug, token+SAPI)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\Debug\\StrafAgent.exe",
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "STRAF_USE_SAMPLE_CONFIG", "value": "1" },
+        { "name": "STRAF_DETECTOR", "value": "token" },
+        { "name": "STRAF_STT", "value": "sapi" },
+        { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
+      ],
+      "preLaunchTask": "cmake: build vs2022-debug",
+      "stopAtEntry": false
+    },
+    {
+      "name": "StrafAgent (Debug, token+Vosk)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build-vosk\\Debug\\StrafAgent.exe",
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "STRAF_USE_SAMPLE_CONFIG", "value": "1" },
+        { "name": "STRAF_DETECTOR", "value": "token" },
+        { "name": "STRAF_STT", "value": "vosk" },
+        { "name": "STRAF_VOSK_MODEL", "value": "${workspaceFolder}\\third_party\\vosk\\models\\vosk-model-small-en-us-0.15" },
+        { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
+      ],
+      "preLaunchTask": "cmake: build vs2022-debug-vosk",
+      "stopAtEntry": false
+    },
+    {
+      "name": "StrafAgent (Debug, stub)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\build\\Debug\\StrafAgent.exe",
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        { "name": "STRAF_USE_SAMPLE_CONFIG", "value": "1" },
+        { "name": "STRAF_DETECTOR", "value": "stub" },
+        { "name": "STRAF_STT", "value": "stub" },
+        { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
+      ],
+      "preLaunchTask": "cmake: build vs2022-debug",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Attach to StrafAgent",
+      "type": "cppvsdbg",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ]
+}

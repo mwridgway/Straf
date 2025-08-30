@@ -37,6 +37,7 @@ add_executable(StrafAgent WIN32
   src/STTSapi.cpp
   src/AudioWasapi.cpp
   src/PenaltyManager.cpp
+  src/TrayWin.cpp
 )
 
 # Optional Vosk backend
