@@ -12,14 +12,12 @@
 #include <memory>
 #include <thread>
 #include <chrono>
-#include <unordered_set>
 
 namespace fs = std::filesystem;
 
 namespace Straf {
 // Forward declarations for factory functions
 std::unique_ptr<IAudioSource> CreateAudioSilent();
-std::unique_ptr<IDetector> CreateDetectorStub();
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
 std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);
 std::optional<AppConfig> LoadConfig(const std::string& path);
@@ -28,7 +26,6 @@ struct AppComponents {
     std::unique_ptr<ITray> tray;
     std::unique_ptr<IOverlayRenderer> overlay;
     std::unique_ptr<IPenaltyManager> penalties;
-    std::unique_ptr<IDetector> detector;
     std::unique_ptr<IAudioSource> audio;
     std::unique_ptr<ITranscriber> stt;
     AppConfig config;
@@ -45,9 +42,6 @@ std::unique_ptr<IAudioSource> CreateConfiguredAudioSource();
 
 // Create and configure STT transcriber based on environment  
 std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std::string>& vocabulary);
-
-// Build vocabulary set for token matching
-std::unordered_set<std::string> BuildVocabularySet(const std::vector<std::string>& words);
 
 // Main application loop
 void RunMainLoop(AppComponents& components);
@@ -178,15 +172,6 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
     return stt;
 }
 
-std::unordered_set<std::string> BuildVocabularySet(const std::vector<std::string>& words) {
-    std::unordered_set<std::string> vocabSet;
-    for (auto w : words){
-        std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c){ return (char)std::tolower(c); });
-        vocabSet.insert(std::move(w));
-    }
-    return vocabSet;
-}
-
 std::unique_ptr<AppComponents> InitializeComponents() {
     auto components = std::make_unique<AppComponents>();
     
@@ -222,14 +207,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
         std::chrono::seconds(components->config.penalty.cooldownSeconds)
     );
     
-    // Initialize detector
-    components->detector = CreateDetectorStub();
-    if (!components->detector->Initialize(components->config.words)) {
-        LogError("Failed to initialize detector");
-        return nullptr;
-    }
-    
-    // Initialize audio and STT
+    // Initialize audio and STT (transcriber handles vocabulary filtering directly)
     components->audio = CreateConfiguredAudioSource();
     components->stt = CreateConfiguredTranscriber(components->config.words);
     
@@ -237,33 +215,20 @@ std::unique_ptr<AppComponents> InitializeComponents() {
 }
 
 void RunMainLoop(AppComponents& components) {
-    // Set up detection callback
+    // Set up detection callback - transcriber will call this directly for detected words
     DetectionCallback onDetect = [&components](const DetectionResult& r){
         LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
         components.penalties->Trigger(r.word);
     };
     
-    // Build vocabulary set for token matching
-    auto vocabSet = BuildVocabularySet(components.config.words);
-    
-    // Start STT with token callback
-    components.stt->Start([onDetect, vocabSet = std::move(vocabSet)](const std::string& token, float conf){
-        std::string t = token;
-        std::transform(t.begin(), t.end(), t.begin(), [](unsigned char c){ return (char)std::tolower(c); });
-        LogInfo("Recognized: %s (%.2f)", t.c_str(), conf);
-        if (vocabSet.find(t) != vocabSet.end()){
-            onDetect(DetectionResult{t, conf});
-        }
+    // Start STT with direct callback (no redundant vocabulary filtering needed - transcriber handles it)
+    components.stt->Start([onDetect](const std::string& token, float conf){
+        // Transcriber already filtered to vocabulary, so directly trigger detection
+        onDetect(DetectionResult{token, conf});
     });
     
     // Start audio with no-op callback (STT handles audio internally)
     components.audio->Start([](const AudioBuffer&){ /* intentionally no-op */ });
-    
-    // Start detector
-    components.detector->Start([&components](const DetectionResult& r){
-        LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
-        components.penalties->Trigger(r.word);
-    });
     
     // Initialize overlay status
     components.overlay->UpdateStatus(components.penalties->GetStarCount(), "");
@@ -290,7 +255,6 @@ void RunMainLoop(AppComponents& components) {
     // Cleanup
     if (components.stt) components.stt->Stop();
     if (components.audio) components.audio->Stop();
-    components.detector->Stop();
 }
 
 }
