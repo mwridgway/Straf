@@ -40,6 +40,7 @@ add_executable(StrafAgent WIN32
   src/PenaltyManager.cpp
   src/TrayWin.cpp
   src/STTVosk.cpp
+  src/DetectorText.cpp
   resources/StrafAgent.rc
 )
 

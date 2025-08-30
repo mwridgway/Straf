@@ -122,67 +122,38 @@ private:
             const char* j = vosk_recognizer_result(rec_);
             LogInfo("Vosk: Got final result: %s", j ? j : "(null)");
             ParseAndEmit(j);
-        } else {
-            const char* j = vosk_recognizer_partial_result(rec_);
-            // Only process partial results that actually have content
-            if (j && strstr(j, "\"partial\" : \"\"") == nullptr && strlen(j) > 25) {
-                LogVerbose("Vosk: Got partial result: %s", j);
-                ParseAndEmit(j); // emit partials too
-            }
         }
+        // Skip partial results - we only want final complete phrases
     }
 
     void ParseAndEmit(const char* json){
         if (!json || !cb_) return;
         
-        // Skip empty partial results to reduce log noise
-        if (strstr(json, "\"partial\" : \"\"") != nullptr) {
-            return; // Don't log or process empty partials
-        }
-        
         // Log the raw JSON for debugging
         LogVerbose("Vosk: Parsing JSON: %s", json);
         
-        // naive parse for "text":"..."
-        const char* t = strstr(json, "\"text\":\"");
-        if (!t) {
-            LogVerbose("Vosk: No 'text' field found in JSON");
-            return;
-        }
-        t += 8;
-        const char* e = strchr(t, '"');
-        if (!e) {
-            LogVerbose("Vosk: Malformed text field in JSON");
-            return;
-        }
-        std::string phrase(t, e);
-        LogVerbose("Vosk: Extracted phrase: '%s'", phrase.c_str());
+        std::string phrase;
         
-        std::string tok;
-        int tokenCount = 0;
-        for (char c : phrase){
-            if (std::isalpha((unsigned char)c)) {
-                tok.push_back((char)std::tolower((unsigned char)c));
-            } else { 
-                if (!tok.empty()){ 
-                    LogVerbose("Vosk: Emitting token: '%s' (confidence: 0.8)", tok.c_str());
-                    cb_(tok, 0.8f); 
-                    tok.clear(); 
-                    tokenCount++;
-                } 
+        // Parse final result: {"text" : "..."}
+        const char* textField = strstr(json, "\"text\" : \"");
+        if (textField) {
+            textField += 10; // Skip past "text" : "
+            const char* endQuote = strchr(textField, '"');
+            if (endQuote) {
+                phrase = std::string(textField, endQuote);
+                LogVerbose("Vosk: Extracted final result: '%s'", phrase.c_str());
             }
         }
-        if (!tok.empty()) {
-            LogVerbose("Vosk: Emitting final token: '%s' (confidence: 0.8)", tok.c_str());
-            cb_(tok, 0.8f);
-            tokenCount++;
+        
+        // Skip empty results
+        if (phrase.empty()) {
+            LogVerbose("Vosk: No text content found or empty result");
+            return;
         }
         
-        if (tokenCount == 0) {
-            LogVerbose("Vosk: No tokens extracted from phrase");
-        } else {
-            LogVerbose("Vosk: Emitted %d tokens total", tokenCount);
-        }
+        // Send the entire phrase to the callback for detector analysis
+        LogVerbose("Vosk: Emitting phrase: '%s' (confidence: 0.8)", phrase.c_str());
+        cb_(phrase, 0.8f);
     }
 
     std::vector<std::string> vocab_;

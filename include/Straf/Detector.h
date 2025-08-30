@@ -35,6 +35,15 @@ public:
     virtual void Stop() = 0;
 };
 
+/**
+ * @brief Interface for text-based detection that can analyze recognized speech.
+ */
+class ITextDetector : public IDetector {
+public:
+    virtual void AnalyzeText(const std::string& recognizedText, float confidence = 1.0f) = 0;
+};
+
 std::unique_ptr<IDetector> CreateDetectorStub();
+std::unique_ptr<ITextDetector> CreateTextAnalysisDetector();
 
 }

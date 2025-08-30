@@ -31,6 +31,7 @@ struct AppComponents {
     std::unique_ptr<IPenaltyManager> penalties;
     std::unique_ptr<IAudioSource> audio;
     std::unique_ptr<ITranscriber> stt;
+    std::unique_ptr<ITextDetector> detector;
     AppConfig config;
 };
 
@@ -149,16 +150,16 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
     }
     
     std::unique_ptr<ITranscriber> stt;
-    if (_wcsicmp(t.c_str(), L"sapi") == 0){
-        stt = CreateTranscriberSapi();
-        LogInfo("STT: SAPI");
-    } else if (_wcsicmp(t.c_str(), L"vosk") == 0){
+    // if (_wcsicmp(t.c_str(), L"sapi") == 0){
+    //     stt = CreateTranscriberSapi();
+    //     LogInfo("STT: SAPI");
+    // } else if (_wcsicmp(t.c_str(), L"vosk") == 0){
         stt = CreateTranscriberVosk();
         LogInfo("STT: Vosk");
-    } else {
-        stt = CreateTranscriberStub();
-        LogInfo("STT: stub");
-    }
+    // } else {
+    //     stt = CreateTranscriberStub();
+    //     LogInfo("STT: stub");
+    // }
     
     // Normalize vocabulary for STT
     std::vector<std::string> sttVocab = vocabulary;
@@ -210,24 +211,36 @@ std::unique_ptr<AppComponents> InitializeComponents() {
         std::chrono::seconds(components->config.penalty.cooldownSeconds)
     );
     
-    // Initialize audio and STT (transcriber handles vocabulary filtering directly)
+    // Initialize detector for vocabulary filtering
+    components->detector = CreateTextAnalysisDetector();
+    if (!components->detector->Initialize(components->config.words)) {
+        LogError("Failed to initialize detector");
+        return nullptr;
+    }
+    
+    // Initialize audio and STT (no vocabulary filtering in STT - detector will handle it)
     components->audio = CreateConfiguredAudioSource();
-    components->stt = CreateConfiguredTranscriber(components->config.words);
+    components->stt = CreateConfiguredTranscriber({}); // Empty vocabulary - let STT recognize everything
     
     return components;
 }
 
 void RunMainLoop(AppComponents& components) {
-    // Set up detection callback - transcriber will call this directly for detected words
+    // Set up detection callback - detector will call this for vocabulary matches
     DetectionCallback onDetect = [&components](const DetectionResult& r){
         LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
         components.penalties->Trigger(r.word);
     };
     
-    // Start STT with direct callback (no redundant vocabulary filtering needed - transcriber handles it)
-    components.stt->Start([onDetect](const std::string& token, float conf){
-        // Transcriber already filtered to vocabulary, so directly trigger detection
-        onDetect(DetectionResult{token, conf});
+    // Start detector with detection callback
+    components.detector->Start(onDetect);
+    
+    // Start STT with detector pipeline - STT passes recognized text to detector for analysis
+    components.stt->Start([&components](const std::string& recognizedText, float conf){
+        if (!recognizedText.empty()) {
+            LogInfo(("STT recognized: \"" + recognizedText + "\" (confidence: " + std::to_string(conf) + ")").c_str());
+            components.detector->AnalyzeText(recognizedText, conf);
+        }
     });
     
     // Start audio with no-op callback (STT handles audio internally)
@@ -258,6 +271,7 @@ void RunMainLoop(AppComponents& components) {
     // Cleanup
     if (components.stt) components.stt->Stop();
     if (components.audio) components.audio->Stop();
+    if (components.detector) components.detector->Stop();
 }
 
 }
