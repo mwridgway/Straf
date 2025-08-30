@@ -13,7 +13,7 @@
 
 namespace Straf {
 
-static int s_level = 1; // 0=error,1=info
+static int s_level = 1; // 0=error, 1=info, 2=verbose
 static HANDLE s_logFile = INVALID_HANDLE_VALUE;
 static CRITICAL_SECTION s_logLock;
 static bool s_logInitialized = false;
@@ -34,7 +34,10 @@ static void EnsureLogFile(){
 }
 
 void InitLogging(const std::string& level){
-    if (level == "error") s_level = 0; else s_level = 1;
+    if (level == "error") s_level = 0;
+    else if (level == "info") s_level = 1;
+    else if (level == "verbose") s_level = 2;
+    else s_level = 1; // default to info
     if (!s_logInitialized) {
         InitializeCriticalSection(&s_logLock);
         s_logInitialized = true;
@@ -102,6 +105,13 @@ void LogInfo(const char* fmt, ...){
     if (s_level < 1) return;
     va_list args; va_start(args, fmt);
     vlog("[INFO]", fmt, args);
+    va_end(args);
+}
+
+void LogVerbose(const char* fmt, ...){
+    if (s_level < 2) return;
+    va_list args; va_start(args, fmt);
+    vlog("[VERBOSE]", fmt, args);
     va_end(args);
 }
 

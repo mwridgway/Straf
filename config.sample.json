@@ -10,6 +10,7 @@
     "channels": 1
   },
   "logging": {
-    "level": "info"
+    "level": "info",
+    "_comment": "Levels: error, info, verbose"
   }
 }

@@ -1,0 +1,15 @@
+{
+  "words": ["test", "hello", "world"],
+  "penalty": {
+    "durationSeconds": 5,
+    "cooldownSeconds": 10,
+    "queueLimit": 5
+  },
+  "audio": {
+    "sampleRate": 16000,
+    "channels": 1
+  },
+  "logging": {
+    "level": "verbose"
+  }
+}

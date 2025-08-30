@@ -47,10 +47,10 @@ public:
         running_ = false;
         if (worker_.joinable()) worker_.join();
         // Cleanup Vosk
-        if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; LogInfo("Vosk: Freed recognizer"); }
+        if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; LogVerbose("Vosk: Freed recognizer"); }
         if (spk_) { vosk_spk_model_free(spk_); spk_ = nullptr; }
-        if (mod_) { vosk_model_free(mod_); mod_ = nullptr; LogInfo("Vosk: Freed model"); }
-        if (audio_) { audio_->Stop(); audio_.reset(); LogInfo("Vosk: Stopped audio"); }
+        if (mod_) { vosk_model_free(mod_); mod_ = nullptr; LogVerbose("Vosk: Freed model"); }
+        if (audio_) { audio_->Stop(); audio_.reset(); LogVerbose("Vosk: Stopped audio"); }
         LogInfo("Vosk: Transcriber stopped");
     }
 
@@ -69,31 +69,31 @@ private:
 
         // Optional grammar constraint
         std::string grammar;
-        if (!vocab_.empty()){
-            std::ostringstream oss; oss << "[";
-            for (size_t i=0;i<vocab_.size();++i){ if (i) oss << ","; oss << '"' << vocab_[i] << '"'; }
-            oss << "]"; grammar = oss.str();
-            rec_ = vosk_recognizer_new_grm(mod_, 16000.0f, grammar.c_str());
-            LogInfo("Vosk: using grammar with %zu words", vocab_.size());
-        } else {
+        // if (!vocab_.empty()){
+        //     std::ostringstream oss; oss << "[";
+        //     for (size_t i=0;i<vocab_.size();++i){ if (i) oss << ","; oss << '"' << vocab_[i] << '"'; }
+        //     oss << "]"; grammar = oss.str();
+        //     rec_ = vosk_recognizer_new_grm(mod_, 16000.0f, grammar.c_str());
+        //     LogInfo("Vosk: using grammar with %zu words", vocab_.size());
+        // } else {
             rec_ = vosk_recognizer_new(mod_, 16000.0f);
             LogInfo("Vosk: using free dictation (no grammar)");
-        }
+        // }
         if (!rec_) { LogError("Vosk: failed to create recognizer"); running_ = false; return; }
 
         // Create audio source (prefer WASAPI)
-        LogInfo("Vosk: Initializing WASAPI audio source");
+        LogVerbose("Vosk: Initializing WASAPI audio source");
         audio_ = CreateAudioWasapi();
         if (!audio_ || !audio_->Initialize(16000, 1)){
             LogError("Vosk: audio init failed"); running_ = false; return; }
         
-        LogInfo("Vosk: Audio initialized successfully, sample rate: 16000Hz");
+        LogVerbose("Vosk: Audio initialized successfully, sample rate: 16000Hz");
 
         // Consume audio and feed recognizer
-        LogInfo("Vosk: Starting audio capture");
+        LogVerbose("Vosk: Starting audio capture");
         audio_->Start([this](const AudioBuffer& buf){ OnAudio(buf); });
 
-        LogInfo("Vosk: Entering main processing loop");
+        LogVerbose("Vosk: Entering main processing loop");
         while (running_) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
         
         LogInfo("Vosk: Exited main processing loop");
@@ -105,9 +105,9 @@ private:
         // Log first few audio callbacks to confirm flow
         static int audioCallCount = 0;
         if (audioCallCount < 5) {
-            LogInfo("Vosk: Received audio buffer #%d, size=%zu samples", ++audioCallCount, buf.size());
+            LogVerbose("Vosk: Received audio buffer #%d, size=%zu samples", ++audioCallCount, buf.size());
         } else if (audioCallCount == 5) {
-            LogInfo("Vosk: Audio flow established (suppressing further audio buffer logs)");
+            LogVerbose("Vosk: Audio flow established (suppressing further audio buffer logs)");
             ++audioCallCount;
         }
         
@@ -126,7 +126,7 @@ private:
             const char* j = vosk_recognizer_partial_result(rec_);
             // Only process partial results that actually have content
             if (j && strstr(j, "\"partial\" : \"\"") == nullptr && strlen(j) > 25) {
-                LogInfo("Vosk: Got partial result: %s", j);
+                LogVerbose("Vosk: Got partial result: %s", j);
                 ParseAndEmit(j); // emit partials too
             }
         }
@@ -141,22 +141,22 @@ private:
         }
         
         // Log the raw JSON for debugging
-        LogInfo("Vosk: Parsing JSON: %s", json);
+        LogVerbose("Vosk: Parsing JSON: %s", json);
         
         // naive parse for "text":"..."
         const char* t = strstr(json, "\"text\":\"");
         if (!t) {
-            LogInfo("Vosk: No 'text' field found in JSON");
+            LogVerbose("Vosk: No 'text' field found in JSON");
             return;
         }
         t += 8;
         const char* e = strchr(t, '"');
         if (!e) {
-            LogInfo("Vosk: Malformed text field in JSON");
+            LogVerbose("Vosk: Malformed text field in JSON");
             return;
         }
         std::string phrase(t, e);
-        LogInfo("Vosk: Extracted phrase: '%s'", phrase.c_str());
+        LogVerbose("Vosk: Extracted phrase: '%s'", phrase.c_str());
         
         std::string tok;
         int tokenCount = 0;
@@ -165,7 +165,7 @@ private:
                 tok.push_back((char)std::tolower((unsigned char)c));
             } else { 
                 if (!tok.empty()){ 
-                    LogInfo("Vosk: Emitting token: '%s' (confidence: 0.8)", tok.c_str());
+                    LogVerbose("Vosk: Emitting token: '%s' (confidence: 0.8)", tok.c_str());
                     cb_(tok, 0.8f); 
                     tok.clear(); 
                     tokenCount++;
@@ -173,15 +173,15 @@ private:
             }
         }
         if (!tok.empty()) {
-            LogInfo("Vosk: Emitting final token: '%s' (confidence: 0.8)", tok.c_str());
+            LogVerbose("Vosk: Emitting final token: '%s' (confidence: 0.8)", tok.c_str());
             cb_(tok, 0.8f);
             tokenCount++;
         }
         
         if (tokenCount == 0) {
-            LogInfo("Vosk: No tokens extracted from phrase");
+            LogVerbose("Vosk: No tokens extracted from phrase");
         } else {
-            LogInfo("Vosk: Emitted %d tokens total", tokenCount);
+            LogVerbose("Vosk: Emitted %d tokens total", tokenCount);
         }
     }
 

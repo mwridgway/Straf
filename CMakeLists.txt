@@ -40,6 +40,7 @@ add_executable(StrafAgent WIN32
   src/PenaltyManager.cpp
   src/TrayWin.cpp
   src/STTVosk.cpp
+  resources/StrafAgent.rc
 )
 
 # Debugger defaults for Visual Studio: use sample config and stub backends

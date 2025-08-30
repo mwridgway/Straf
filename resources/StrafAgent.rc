@@ -1,0 +1,7 @@
+#include <windows.h>
+
+// Define the icon resource
+#define IDI_STRAF_ICON    101
+
+// Icon resource
+IDI_STRAF_ICON ICON "straf_icon.ico"

@@ -12,10 +12,13 @@
 #include <memory>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
 namespace fs = std::filesystem;
 
 namespace Straf {
+// Global shutdown flag for inter-thread communication
+static std::atomic<bool> g_shouldExit{false};
 // Forward declarations for factory functions
 std::unique_ptr<IAudioSource> CreateAudioSilent();
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
@@ -179,7 +182,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     components->tray = CreateTray();
     components->tray->Run([]{
         LogInfo("Tray exit requested, shutting down.");
-        PostQuitMessage(0);
+        g_shouldExit = true;
     });
     
     // Load configuration
@@ -236,7 +239,7 @@ void RunMainLoop(AppComponents& components) {
     // Main message loop
     MSG msg{};
     auto lastTick = std::chrono::steady_clock::now();
-    while (true){
+    while (!g_shouldExit){
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)){
             if (msg.message == WM_QUIT) break;
             TranslateMessage(&msg);
