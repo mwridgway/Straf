@@ -16,7 +16,7 @@ public:
     virtual void Stop() = 0;
 };
 
-std::unique_ptr<IAudioSource> CreateAudioStub();
+std::unique_ptr<IAudioSource> CreateAudioSilent();
 // WASAPI-based microphone capture (shared mode), outputs mono 16kHz float frames (20ms typical)
 std::unique_ptr<IAudioSource> CreateAudioWasapi();
 

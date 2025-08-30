@@ -4,7 +4,7 @@ project(Straf LANGUAGES CXX)
 # Options
 option(STRAF_USE_VCPKG "Use vcpkg for dependencies" ON)
 option(STRAF_ENABLE_CLANG_TIDY "Run clang-tidy during builds (if available)" OFF)
-option(STRAF_ENABLE_VOSK "Enable Vosk STT backend" OFF)
+option(STRAF_ENABLE_VOSK "Enable Vosk STT backend" ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -12,6 +12,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Compiler settings
 if(MSVC)
   add_compile_options(/W4 /permissive- /MP /EHsc)
+  # Ensure PDB debug symbols are generated for Debug config
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT ProgramDatabase)
 else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -32,28 +34,50 @@ add_executable(StrafAgent WIN32
   src/DetectorStub.cpp
   src/OverlayClassic.cpp
   src/OverlayBar.cpp
-  src/AudioStub.cpp
+  src/AudioSilent.cpp
   src/STTStub.cpp
   src/STTSapi.cpp
   src/AudioWasapi.cpp
   src/PenaltyManager.cpp
   src/TrayWin.cpp
+  src/STTVosk.cpp
 )
 
-# Optional Vosk backend
+# Debugger defaults for Visual Studio: use sample config and stub backends
+set_target_properties(StrafAgent PROPERTIES
+  VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  VS_DEBUGGER_ENVIRONMENT "STRAF_USE_SAMPLE_CONFIG=1\nSTRAF_STT=vosk\nSTRAF_AUDIO_SOURCE=wasapi"
+)
+
+# Optional Vosk backend with safe fallback
+set(HAS_VOSK FALSE)
 if(STRAF_ENABLE_VOSK)
-  target_sources(StrafAgent PRIVATE src/STTVosk.cpp)
-  if(DEFINED ENV{VOSK_INCLUDE_DIR})
-    target_include_directories(StrafAgent PRIVATE $ENV{VOSK_INCLUDE_DIR})
-  endif()
+  # Try env-provided lib first
   if(DEFINED ENV{VOSK_LIBRARY})
+    set(HAS_VOSK TRUE)
     target_link_libraries(StrafAgent PRIVATE $ENV{VOSK_LIBRARY})
+  else()
+    find_library(VOSK_LIB NAMES libvosk vosk)
+    if(VOSK_LIB)
+      set(HAS_VOSK TRUE)
+      target_link_libraries(StrafAgent PRIVATE ${VOSK_LIB})
+    endif()
+  endif()
+endif()
+
+# Vosk backend
+if(DEFINED ENV{VOSK_INCLUDE_DIR})
+  target_include_directories(StrafAgent PRIVATE $ENV{VOSK_INCLUDE_DIR})
+endif()
+if(DEFINED ENV{VOSK_LIBRARY})
+  target_link_libraries(StrafAgent PRIVATE $ENV{VOSK_LIBRARY})
+else()
+  find_library(VOSK_LIB NAMES libvosk)
+  if(VOSK_LIB)
+    target_link_libraries(StrafAgent PRIVATE ${VOSK_LIB})
   else()
     target_link_libraries(StrafAgent PRIVATE vosk)
   endif()
-else()
-  # Provide a stub factory so CreateTranscriberVosk() links even without Vosk
-  target_sources(StrafAgent PRIVATE src/STTVoskStub.cpp)
 endif()
 
 # Target-level defines
@@ -69,6 +93,7 @@ if(STRAF_ENABLE_CLANG_TIDY)
   endif()
 endif()
 
+# Includes and optional JSON lib
 target_include_directories(StrafAgent PRIVATE include)
 if(nlohmann_json_FOUND)
   target_link_libraries(StrafAgent PRIVATE nlohmann_json::nlohmann_json)

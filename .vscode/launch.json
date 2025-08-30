@@ -40,8 +40,8 @@
       "cwd": "${workspaceFolder}",
       "environment": [
         { "name": "STRAF_USE_SAMPLE_CONFIG", "value": "1" },
-        { "name": "STRAF_DETECTOR", "value": "stub" },
-        { "name": "STRAF_STT", "value": "stub" },
+        { "name": "STRAF_DETECTOR", "value": "token" },
+        { "name": "STRAF_STT", "value": "vosk" },
         { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
       ],
       "preLaunchTask": "cmake: build vs2022-debug",

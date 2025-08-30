@@ -19,7 +19,7 @@ namespace fs = std::filesystem;
 
 namespace Straf {
 // Forward declarations for factory functions
-std::unique_ptr<IAudioSource> CreateAudioStub();
+std::unique_ptr<IAudioSource> CreateAudioSilent();
 std::unique_ptr<IDetector> CreateDetectorStub();
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
 std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);
@@ -124,12 +124,12 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
             audio = CreateAudioWasapi();
             LogInfo("Audio source: WASAPI mic");
         } else {
-            audio = CreateAudioStub();
-            LogInfo("Audio source: stub");
+            audio = CreateAudioSilent();
+            LogInfo("Audio source: silent");
         }
         if (!audio->Initialize(16000, 1)){
-            LogError("Audio initialize failed; falling back to stub");
-            audio = CreateAudioStub();
+            LogError("Audio initialize failed; falling back to silent");
+            audio = CreateAudioSilent();
             audio->Initialize(16000, 1);
         }
         // Start audio with a lightweight no-op callback for now. This primes the pipeline for upcoming STT.

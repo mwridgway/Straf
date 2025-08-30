@@ -73,3 +73,5 @@ logs/
 
 # Crash dumps
 *.dmp
+build-vosk/*
+.vs/*

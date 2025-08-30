@@ -1,4 +1,4 @@
-# Project Title
+# Straf: Want jy moenie vloekie
 
 A program that monitors mic audio on the computer to detect words that are expletives and penalises the user
 when one is detected.  
@@ -21,23 +21,16 @@ Dependencies:
 	- Alternate: drop single header `nlohmann/json.hpp` into your include path
 	- Note: The project also has a small built-in fallback parser for basic configs, so it will build without nlohmann-json, but nlohmann-json is preferred.
 
-Optional:
-- Vosk (offline STT)
-	- Build flag: `-DSTRAF_ENABLE_VOSK=ON`
-	- Provide include/lib via env vars or system paths:
-		- `VOSK_INCLUDE_DIR` (folder containing `vosk_api.h`)
-		- `VOSK_LIBRARY` (full path to vosk library, e.g., `C:\path\to\libvosk.lib`)
+### Default build (quick start)
 
-	### Default build (quick start)
+If you just want a standard Debug build with MSVC:
 
-	If you just want a standard Debug build with MSVC:
+```powershell
+cmake -S . -B build
+cmake --build build --config Debug
+```
 
-	```powershell
-	cmake -S . -B build
-	cmake --build build --config Debug
-	```
-
-	Artifacts: `build/Debug/StrafAgent.exe`.
+Artifacts: `build/Debug/StrafAgent.exe`.
 
 ### Option A: Build with vcpkg (recommended)
 
@@ -70,7 +63,7 @@ cmake --build build --config Debug
 
 You have two choices:
 - Place `nlohmann/json.hpp` somewhere in your compiler's include path (e.g., `third_party/nlohmann/json.hpp`). The CMake setup will discover it automatically.
-- Do nothing and rely on the project’s built-in minimal JSON parser (sufficient for the provided sample config). You can add nlohmann-json later without code changes.
+- Do nothing and rely on the project's built-in minimal JSON parser (sufficient for the provided sample config). You can add nlohmann-json later without code changes.
 
 Build commands:
 
@@ -81,76 +74,56 @@ cmake --build build --config Debug
 
 Artifacts will be under `build/Debug/StrafAgent.exe` (for Debug config).
 
-### Enable Vosk STT (optional)
+### Build and Run with Vosk STT (Windows)
 
-```powershell
-cmake -S . -B build -DSTRAF_ENABLE_VOSK=ON
-# If not in default paths, point to Vosk include/lib
-$env:VOSK_INCLUDE_DIR = 'C:\path\to\vosk\include'
-$env:VOSK_LIBRARY = 'C:\path\to\vosk\lib\libvosk.lib'
-cmake --build build --config Debug
-```
+1. Download and extract the Vosk SDK (prebuilt binaries recommended) to e.g. `C:\tools\vosk`.
+   - Ensure you have:
+     - `C:\tools\vosk\vosk_api.h`
+     - `C:\tools\vosk\libvosk.lib`
+     - `C:\tools\vosk\libvosk.dll` (not vosk.dll)
+     - `C:\tools\vosk\libgcc_s_seh-1.dll`
+     - `C:\tools\vosk\libstdc++-6.dll`
+     - `C:\tools\vosk\libwinpthread-1.dll`
 
-At runtime, select the STT backend with an env var:
+2. Download a Vosk model (e.g. English small model) and extract to e.g. `C:\models\vosk-model-small-en-us-0.15`.
+   - Official models: https://alphacephei.com/vosk/models
 
-```powershell
-$env:STRAF_STT = 'vosk'   # or 'sapi' or 'stub'
-$env:STRAF_AUDIO_SOURCE = 'wasapi'  # recommended so Vosk gets real mic audio
-.\n+build\Debug\StrafAgent.exe
-```
+3. Set environment variables for build and runtime:
+   ```powershell
+   $env:VOSK_INCLUDE_DIR = 'C:\tools\vosk'
+   $env:VOSK_LIBRARY     = 'C:\tools\vosk\libvosk.lib'
+   $env:PATH             = "C:\tools\vosk;$env:PATH"  # For libvosk.dll and dependencies
+   $env:STRAF_VOSK_MODEL = 'C:\models\vosk-model-small-en-us-0.15'
+   ```
 
-## Vosk development setup (Windows)
+4. Configure and build:
+   ```powershell
+   cmake -S . -B build
+   cmake --build build --config Debug
+   ```
 
-Vosk is an offline speech-to-text engine. To use it here, you need the SDK (headers + libs/DLL) and a model.
+5. Run with Vosk backend:
+   ```powershell
+   $env:STRAF_STT = 'vosk'
+   $env:STRAF_AUDIO_SOURCE = 'wasapi'   # recommended for real mic capture
+   ./build/Debug/StrafAgent.exe
+   ```
 
-1) Get the Vosk SDK (headers and libs)
-- Option A: Prebuilt Windows binaries (recommended). Unzip somewhere like `C:\tools\vosk`.
-	- Ensure you have:
-		- `C:\tools\vosk\include\vosk_api.h`
-		- `C:\tools\vosk\lib\libvosk.lib`
-		- `C:\tools\vosk\bin\vosk.dll`
-- Option B: Build from source (if you need a custom build). Build the C API and produce the same artifacts.
+6. To exit, use the tray icon's "Exit" menu or close from Task Manager if needed.
 
-2) Get a model
-- Download a model matching your language, e.g. a small English model.
-- Official model downloads: https://alphacephei.com/vosk/models
-- Extract to a directory, for example: `C:\models\vosk-model-small-en-us-0.15`.
+**Note:** If you see runtime errors about missing DLLs, ensure `libvosk.dll`, `libgcc_s_seh-1.dll`, `libstdc++-6.dll`, and `libwinpthread-1.dll` are on your `PATH` or copied next to `StrafAgent.exe`.
 
-3) Configure environment variables (PowerShell)
-```powershell
-# Point CMake to the SDK
-$env:VOSK_INCLUDE_DIR = 'C:\tools\vosk\include'
-$env:VOSK_LIBRARY     = 'C:\tools\vosk\lib\libvosk.lib'
+Artifacts: `build/Debug/StrafAgent.exe`
 
-# Runtime needs vosk.dll on PATH (or copy next to StrafAgent.exe)
-$env:PATH = "C:\tools\vosk\bin;$env:PATH"
-
-# Tell the app where your model is
-$env:STRAF_VOSK_MODEL = 'C:\models\vosk-model-small-en-us-0.15'
-```
-
-4) Build with Vosk enabled
-```powershell
-cmake -S . -B build -DSTRAF_ENABLE_VOSK=ON
-cmake --build build --config Debug
-```
-
-5) Run with the Vosk backend
-```powershell
-$env:STRAF_STT = 'vosk'
-$env:STRAF_AUDIO_SOURCE = 'wasapi'   # recommended for real mic capture
-./build/Debug/StrafAgent.exe
-```
-
-Troubleshooting
+### Vosk Troubleshooting
 - Build error: `Cannot open include file: 'vosk_api.h'`
 	- Set `VOSK_INCLUDE_DIR` to the folder containing `vosk_api.h`.
-- Link error: `unresolved external symbol` for Vosk
+- Link error: `unresolved external symbol` or `cannot open file 'vosk.lib'`
 	- Set `VOSK_LIBRARY` to the full path to `libvosk.lib`.
-- Runtime error: `The code execution cannot proceed because vosk.dll was not found`
-	- Add the SDK `bin` folder to `PATH`, or copy `vosk.dll` next to `StrafAgent.exe`.
+- Runtime error: `The code execution cannot proceed because libvosk.dll was not found`
+	- Add the SDK folder to `PATH`, or copy `libvosk.dll` and dependencies next to `StrafAgent.exe`.
 - No words recognized or very slow
-	- Use the small model first, confirm audio is flowing (see “WASAPI endpoint …” in logs), and verify `STRAF_VOSK_MODEL` points to the model folder (not a file).
+	- Use the small model first, confirm audio is flowing (see "WASAPI endpoint …" in logs), and verify `STRAF_VOSK_MODEL` points to the model folder (not a file).
 - Constrained vocabulary
 	- The app passes your configured words as a grammar to Vosk when available, improving accuracy/latency. Clear your word list to allow open dictation.
 

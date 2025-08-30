@@ -5,6 +5,9 @@
 
 namespace Straf {
 
+// AudioSilent: A silent audio generator that produces zero-filled audio buffers
+// at regular intervals (20ms, 320 samples at 16kHz). Used as a fallback when
+// real microphone capture is unavailable or for testing purposes.
 class AudioSilent : public IAudioSource {
 public:
     bool Initialize(int, int) override { return true; }

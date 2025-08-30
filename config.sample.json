@@ -1,15 +1,15 @@
 {
-  "words": ["fuck", "shit", "asshole", "bitch", "trash", "twat"],
+  "words": ["noob", "bot", "trash", "ez", "rekt", "camping rat", "hacker", "cheater", "smurf", "toxic", "tryhard", "lucker", "lagger", "dog", "clown", "idiot", "moron", "stupid", "dumbass", "loser", "fk", "ffs", "wtf", "shit", "bullshit", "fuck", "fucking", "asshole", "bitch", "cunt", "retard", "gay", "pussy", "motherfucker", "suck my dick", "dickhead"],
   "penalty": {
-    "durationSeconds": 10,
-    "cooldownSeconds": 60,
+    "durationSeconds": 5,
+    "cooldownSeconds": 10,
     "queueLimit": 5
-  },
-  "logging": {
-    "level": "info"
   },
   "audio": {
     "sampleRate": 16000,
     "channels": 1
+  },
+  "logging": {
+    "level": "info"
   }
 }
