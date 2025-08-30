@@ -7,50 +7,48 @@
   },
   "configurePresets": [
     {
-      "name": "vs2022-x64-debug",
-      "displayName": "VS2022 x64 Debug",
+      "name": "default",
+      "displayName": "Default",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "CMAKE_CXX_STANDARD": "20",
-        "CMAKE_BUILD_TYPE": "Debug",
-        "STRAF_USE_VCPKG": "ON"
-      }
-    },
-    {
-      "name": "vs2022-x64-debug-vosk",
-      "displayName": "VS2022 x64 Debug with Vosk",
-      "generator": "Visual Studio 17 2022", 
-      "architecture": "x64",
-      "binaryDir": "${sourceDir}/build-vosk",
+      "toolchainFile": "C:/Users/mwrid/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_CXX_STANDARD": "20",
         "CMAKE_BUILD_TYPE": "Debug",
         "STRAF_USE_VCPKG": "ON"
       },
       "environment": {
+        "VCPKG_ROOT": "C:/Users/mwrid/vcpkg",
         "VOSK_INCLUDE_DIR": "C:/tools/vosk",
         "VOSK_LIBRARY": "C:/tools/vosk/libvosk.lib"
+      }
+    },
+    {
+      "name": "vs2022-x64-debug",
+      "displayName": "VS2022 x64 Debug (legacy)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build-legacy",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "STRAF_USE_VCPKG": "ON"
       }
     }
   ],
   "buildPresets": [
     {
-      "name": "debug",
-      "configurePreset": "vs2022-x64-debug",
-      "configuration": "Debug",
-      "targets": [
-        "StrafAgent"
-      ]
+      "name": "default",
+      "displayName": "Default Build",
+      "configurePreset": "default",
+      "configuration": "Debug"
     },
     {
-      "name": "debug-vosk",
-      "configurePreset": "vs2022-x64-debug-vosk",
-      "configuration": "Debug",
-      "targets": [
-        "StrafAgent"
-      ]
+      "name": "debug",
+      "displayName": "Debug Build (legacy)",
+      "configurePreset": "vs2022-x64-debug", 
+      "configuration": "Debug"
     }
   ],
   "testPresets": []
