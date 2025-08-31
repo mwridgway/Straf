@@ -1,6 +1,28 @@
-# Straf Architecture
+# Straf ArchitKey responsKey - Captur- Render an always-on-top overlay (Direct3D11 + DirectComposition + Direct2D/DirectWrite) showing "stars" and labels GTA-style.
+- Load configuration from `%AppData%\Straf\config.json`.mic audio (WASAPI), optionally transcribe tokens (Vosk or SAPI), match against a configured vocabulary, and enqueue penalties.
+- Render an always-on-top overlay (Direct3D11 + DirectComposition + Direct2D/DirectWrite) showing "stars" and labels GTA-style.
+- Load configuration from `%AppData%\Straf\config.json`.
 
-This document describes the architecture of the Straf application: a Windows user agent that captures microphone audio, detects user-defined words, and applies on-screen penalties via an- Optional Windows Service to auto-start the agent in the user's interactive session - no UI in session 0. IPC via named pipe if implemented.
+## Code Map
+
+- Config: `include/Straf/Config.h`, `src/Config.cpp`
+- Audio: `include/Straf/Audio.h`, `src/AudioWasapi.cpp`, `src/AudioSilent.cpp`ilities:
+- Capture mic audio (WASAPI), optionally transcribe tokens (Vosk or SAPI), match against a configured vocabulary, and enqueue penalties.
+- Render an always-on-top overlay (Direct3D11 + DirectComposition + Direct2D/DirectWrite) showing "stars" and labels GTA-style.
+- Load configuration from `%AppData%\Straf\config.json`.ities:
+- Capture mic audio (WASAPI), optionally transcribe tokens (Vosk or SAPI), match against a configured vocabulary, and enqueue penalties.
+- Render an always-on-top overlay (Direct3D11 + DirectComposition + Direct2D/DirectWrite) showing "stars" and labels GTA-style.
+- Load configuration from `%AppData%\Straf\config.json`.
+
+## Code Map
+
+- Config: `include/Straf/Config.h`, `src/Config.cpp`
+- Audio: `include/Straf/Audio.h`, `src/AudioWasapi.cpp`, `src/AudioSilent.cpp`
+- STT: `include/Straf/STT.h`, `src/STTSapi.cpp`, `src/STTVosk.cpp`
+- Detector: `include/Straf/Detector.h`, `src/DetectorToken.cpp` (token/phrase), `src/DetectorStub.cpp`
+- Overlay: `include/Straf/Overlay.h`, `src/OverlayClassic.cpp`, `src/OverlayBar.cpp`
+- Penalties: `include/Straf/PenaltyManager.h`, `src/PenaltyManager.cpp`
+- Entry point / wiring: `src/main.cpp`cument describes the architecture of the Straf application: a Windows user agent that captures microphone audio, detects user-defined words, and applies on-screen penalties via an- Optional Windows Service to auto-start the agent in the user's interactive session - no UI in session 0. IPC via named pipe if implemented.
 - VAD and confidence thresholding to reduce false positives.
 - Hot reload of config and dynamic vocabulary updates.
 - Tests for config parsing and penalty state machine.ays-on-top overlay.
@@ -15,12 +37,11 @@ This document describes the architecture of the Straf application: a Windows use
 Key responsibilities:
 - Capture mic audio (WASAPI), optionally transcribe tokens (Vosk or SAPI), match against a configured vocabulary, and enqueue penalties.
 - Render an always-on-top overlay (Direct3D11 + DirectComposition + Direct2D/DirectWrite) showing “stars” and labels GTA-style.
-- Persist logs to `%LocalAppData%\Straf\logs\StrafAgent.log` and load configuration from `%AppData%\Straf\config.json`.
+- Load configuration from `%AppData%\Straf\config.json`.
 
 ## Code Map
 
 - Config: `include/Straf/Config.h`, `src/Config.cpp`
-- Logging: `include/Straf/ModernLogging.h`, `src/ModernLogging.cpp`
 - Audio: `include/Straf/Audio.h`, `src/AudioWasapi.cpp`, `src/AudioSilent.cpp`
 - STT: `include/Straf/STT.h`, `src/STTSapi.cpp`, `src/STTVosk.cpp`
 - Detector: `include/Straf/Detector.h`, `src/DetectorToken.cpp` (token/phrase), `src/DetectorStub.cpp`
@@ -51,7 +72,6 @@ Notes:
 graph LR
   subgraph App
     M[main.cpp] --> CFG[Config]
-    M --> LOG[Logging]
     M --> OVR[Overlay]
     M --> PEN[PenaltyManager]
     M --> DET[Detector]
@@ -60,7 +80,6 @@ graph LR
   end
 
   CFG --- File[(config.json)]
-  LOG --- File2[(StrafAgent.log)]
 
   subgraph Implementations
     AUD1[AudioWasapi]
@@ -111,7 +130,6 @@ sequenceDiagram
   - `words`: list of strings to match
   - `penalty`: `durationSeconds`, `cooldownSeconds`, `queueLimit`
   - `audio`: `sampleRate`, `channels` - target for capture pipeline; currently 16 kHz, mono
-  - `logging`: `level` - `info` or `error`
 
 Environment overrides:
 - `STRAF_CONFIG_PATH`: absolute path to a config file
@@ -152,13 +170,6 @@ Reference: `src/AudioWasapi.cpp:1`.
 
 References: `include/Straf/STT.h:1`, `src/STTSapi.cpp:1`, `src/STTVosk.cpp:1`.
 
-## Logging
-
-- Info/error logging with timestamp; writes to OutputDebugString and file `%LocalAppData%\Straf\logs\StrafAgent.log`.
-- Level from config `logging.level` (default `info`).
-
-Reference: `src/Logging.cpp:1`.
-
 ## Build & Flags
 
 - Build with MSVC or via CMake presets; optional vcpkg for `nlohmann-json`.
@@ -177,13 +188,11 @@ flowchart TB
   subgraph "Windows Session"
     App[StrafAgent.exe]
     Overlay["Overlay Window<br/>top-most, click-through"]
-    Logs[%LocalAppData%\Straf\logs]
     Config[%AppData%\Straf\config.json]
   end
 
   Mic[Default Mic Device] --> App
   App --> Overlay
-  App --> Logs
   Config --> App
 
   subgraph Optional

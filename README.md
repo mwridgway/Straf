@@ -123,7 +123,7 @@ Artifacts: `build/Debug/StrafAgent.exe`
 - Runtime error: `The code execution cannot proceed because libvosk.dll was not found`
 	- Add the SDK folder to `PATH`, or copy `libvosk.dll` and dependencies next to `StrafAgent.exe`.
 - No words recognized or very slow
-	- Use the small model first, confirm audio is flowing (see "WASAPI endpoint …" in logs), and verify `STRAF_VOSK_MODEL` points to the model folder (not a file).
+	- Use the small model first, confirm audio is flowing, and verify `STRAF_VOSK_MODEL` points to the model folder (not a file).
 - Constrained vocabulary
 	- The app passes your configured words as a grammar to Vosk when available, improving accuracy/latency. Clear your word list to allow open dictation.
 
@@ -147,34 +147,12 @@ cmake --build --preset vs2022-debug-tidy --config Debug
 
 ## Running
 
-On first run, a config file is created at `%AppData%\Straf\config.json` (copied from `config.sample.json` if missing). Edit it to set your words, penalty timings, and logging level.
+On first run, a config file is created at `%AppData%\Straf\config.json` (copied from `config.sample.json` if missing). Edit it to set your words and penalty timings.
 
 Quick run after a Debug build (from repo root):
 
 ```powershell
 ./build/Debug/StrafAgent.exe
-```
-
-### View logs
-
-Logs are written to `%LocalAppData%\Straf\logs\StrafAgent.log`.
-
-- Open the log folder:
-
-```powershell
-Start-Process $env:LOCALAPPDATA\Straf\logs
-```
-
-- Tail the log in real time:
-
-```powershell
-Get-Content -Path "$env:LOCALAPPDATA\Straf\logs\StrafAgent.log" -Wait -Tail 100
-```
-
-- Filter for errors/warnings while tailing:
-
-```powershell
-Get-Content "$env:LOCALAPPDATA\Straf\logs\StrafAgent.log" -Wait | Select-String -Pattern 'ERROR|WARN'
 ```
 
 ## Features

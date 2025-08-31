@@ -44,11 +44,8 @@ This document outlines how to implement the app described in `README.md`: listen
 
 6) Config & Storage
 - Location: %AppData%/Straf/config.json.
-- Contents: word list, penalty visuals (theme), durations/cooldowns, queue limit, output/log levels, device IDs.
+- Contents: word list, penalty visuals (theme), durations/cooldowns, queue limit, device IDs.
 - Hot reload: watch file for changes to update vocab and visuals on the fly.
-
-7) Logging & Telemetry
-- Local file logging (rolling) in %LocalAppData%/Straf/logs. No network telemetry.
 
 ## Data Flow
 - WASAPI frames → VAD → ASR/KWS (grammar = word list) → normalized tokens → Profanity Matcher → Penalty Manager → Overlay Renderer.
