@@ -2,6 +2,7 @@
 #include "Straf/Overlay.h"
 #include "Straf/Logging.h"
 #include "Straf/ModernLogging.h"
+#include <fmt/format.h>
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -46,7 +47,7 @@ public:
         if (SUCCEEDED(hr)) {
             comInitialized_ = true;
         } else if (hr != RPC_E_CHANGED_MODE) {
-            LogError("CoInitializeEx failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "CoInitializeEx failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
         
@@ -54,7 +55,7 @@ public:
         if (!createWindow()) return false;
         if (!initD3D()) return false;
         if (!initComposition()) return false;
-    LogInfo("OverlayClassic initialized (D3D11 + DirectComposition)");
+    Straf::StrafLog(spdlog::level::info, "OverlayClassic initialized (D3D11 + DirectComposition)");
         return true;
     }
 
@@ -123,7 +124,7 @@ private:
             x, y, cx, cy,
             nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
         if (!hwnd_) {
-            LogError("Overlay window creation failed: %lu", GetLastError());
+            Straf::StrafLog(spdlog::level::err, "Overlay window creation failed: " + std::to_string(GetLastError()));
             return false;
         }
         // Ensure layered attributes are applied (fully opaque visual, but hit-test transparent)
@@ -144,7 +145,7 @@ private:
             flags, flIn, ARRAYSIZE(flIn), D3D11_SDK_VERSION,
             &d3dDevice_, &flOut, &d3dCtx_);
         if (FAILED(hr)) {
-            LogError("D3D11CreateDevice failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "D3D11CreateDevice failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
         hr = d3dDevice_.As(&dxgiDevice_);
@@ -155,7 +156,7 @@ private:
         // Prefer creating a fresh Factory2
         hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&dxgiFactory_));
         if (FAILED(hr)) {
-            LogError("CreateDXGIFactory2 failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "CreateDXGIFactory2 failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
         return true;
@@ -165,19 +166,19 @@ private:
         // Create DirectComposition device
         HRESULT hr = DCompositionCreateDevice(dxgiDevice_.Get(), IID_PPV_ARGS(&dcompDevice_));
         if (FAILED(hr)) {
-            LogError("DCompositionCreateDevice failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "DCompositionCreateDevice failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
 
         // DirectComposition visual tree first
         HRESULT hrTgt = dcompDevice_->CreateTargetForHwnd(hwnd_, TRUE, &dcompTarget_);
         if (FAILED(hrTgt)) {
-            LogError("CreateTargetForHwnd failed: 0x%08X", hrTgt);
+            Straf::StrafLog(spdlog::level::err, "CreateTargetForHwnd failed: 0x" + fmt::format("{:08X}", hrTgt));
             return false;
         }
         HRESULT hrVis = dcompDevice_->CreateVisual(&visual_);
         if (FAILED(hrVis)) {
-            LogError("CreateVisual failed: 0x%08X", hrVis);
+            Straf::StrafLog(spdlog::level::err, "CreateVisual failed: 0x" + fmt::format("{:08X}", hrVis));
             return false;
         }
 
@@ -198,35 +199,35 @@ private:
         HRESULT hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
         if (FAILED(hrSc)) {
             // Fallback: try with FLIP_SEQUENTIAL
-            LogInfo("FLIP_DISCARD failed, trying FLIP_SEQUENTIAL");
+            Straf::StrafLog(spdlog::level::info, "FLIP_DISCARD failed, trying FLIP_SEQUENTIAL");
             desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
             hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
             if (FAILED(hrSc)) {
                 // Final fallback: try minimal settings
-                LogInfo("FLIP_SEQUENTIAL failed, trying minimal settings");
+                Straf::StrafLog(spdlog::level::info, "FLIP_SEQUENTIAL failed, trying minimal settings");
                 desc.Width = 256;
                 desc.Height = 64;
                 desc.BufferCount = 1;
                 desc.Scaling = DXGI_SCALING_NONE;
                 hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
                 if (FAILED(hrSc)) {
-                    LogError("CreateSwapChainForComposition failed: 0x%08X", hrSc);
+                    Straf::StrafLog(spdlog::level::err, "CreateSwapChainForComposition failed: 0x" + fmt::format("{:08X}", hrSc));
                     return false;
                 }
             }
         }
-        LogInfo("SwapChainForComposition created successfully");
+        Straf::StrafLog(spdlog::level::info, "SwapChainForComposition created successfully");
 
         // Create render target view for back buffer
         ComPtr<ID3D11Texture2D> backBuf;
         hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuf));
         if (FAILED(hr)) {
-            LogError("GetBuffer failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "GetBuffer failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
         hr = d3dDevice_->CreateRenderTargetView(backBuf.Get(), nullptr, &rtv_);
         if (FAILED(hr)) {
-            LogError("CreateRenderTargetView failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "CreateRenderTargetView failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
 
@@ -238,7 +239,7 @@ private:
         dcompTarget_->SetRoot(visual_.Get());
         hr = dcompDevice_->Commit();
         if (FAILED(hr)) {
-            LogError("DirectComposition Commit failed: 0x%08X", hr);
+            Straf::StrafLog(spdlog::level::err, "DirectComposition Commit failed: 0x" + fmt::format("{:08X}", hr));
             return false;
         }
         return true;
@@ -324,13 +325,13 @@ private:
             // opts.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #endif
             hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &opts, &d2dFactory_);
-            if (FAILED(hr)) { LogError("D2D1CreateFactory failed: 0x%08X", hr); return false; }
+            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "D2D1CreateFactory failed: 0x" + fmt::format("{:08X}", hr)); return false; }
         }
 
         // Create DWrite factory
         if (!dwFactory_){
             hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), &dwFactory_);
-            if (FAILED(hr)) { LogError("DWriteCreateFactory failed: 0x%08X", hr); return false; }
+            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "DWriteCreateFactory failed: 0x" + fmt::format("{:08X}", hr)); return false; }
         }
 
         // Get DXGI device and create D2D device/context
@@ -340,9 +341,9 @@ private:
             if (FAILED(hr)) return false;
         }
         hr = d2dFactory_->CreateDevice(dxgiDeviceLocal.Get(), &d2dDevice_);
-        if (FAILED(hr)) { LogError("ID2D1Factory1::CreateDevice failed: 0x%08X", hr); return false; }
+        if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "ID2D1Factory1::CreateDevice failed: 0x" + fmt::format("{:08X}", hr)); return false; }
         hr = d2dDevice_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx_);
-        if (FAILED(hr)) { LogError("ID2D1Device::CreateDeviceContext failed: 0x%08X", hr); return false; }
+        if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "ID2D1Device::CreateDeviceContext failed: 0x" + fmt::format("{:08X}", hr)); return false; }
 
         // Create D2D target bitmap from swap chain back buffer
         ComPtr<IDXGISurface> surface;
@@ -355,7 +356,7 @@ private:
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
             dpiX, dpiY);
         hr = d2dCtx_->CreateBitmapFromDxgiSurface(surface.Get(), &bp, &d2dTarget_);
-        if (FAILED(hr)) { LogError("CreateBitmapFromDxgiSurface failed: 0x%08X", hr); return false; }
+        if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "CreateBitmapFromDxgiSurface failed: 0x" + fmt::format("{:08X}", hr)); return false; }
         d2dCtx_->SetTarget(d2dTarget_.Get());
 
         // Create brushes
@@ -377,7 +378,7 @@ private:
                 DWRITE_FONT_STRETCH_NORMAL, 48.0f, L"en-us", &textFormat_);
             if (SUCCEEDED(lastHr)) break;
         }
-        if (FAILED(lastHr)) { LogError("DWrite CreateTextFormat failed: 0x%08X", lastHr); return false; }
+        if (FAILED(lastHr)) { Straf::StrafLog(spdlog::level::err, "DWrite CreateTextFormat failed: 0x" + fmt::format("{:08X}", lastHr)); return false; }
         textFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         textFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
@@ -456,24 +457,22 @@ std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(std::shared_ptr<ILogger> 
     return std::make_unique<OverlayClassic>();
 }
 
-std::unique_ptr<IOverlayRenderer> CreateOverlayStub(std::shared_ptr<ILogger> logger){ 
-    // Allow disabling overlay completely via env var (useful for tests)
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub() {
     if (IsEnvSetA("STRAF_NO_OVERLAY")) {
-        LogInfo("Using no-op overlay (STRAF_NO_OVERLAY set)");
+        StrafLog(spdlog::level::info, "Using no-op overlay (STRAF_NO_OVERLAY set)");
         return std::make_unique<OverlayNoop>();
     }
-    // Style switch via STRAF_OVERLAY_STYLE
     char style[32]{};
     if (GetEnvironmentVariableA("STRAF_OVERLAY_STYLE", style, (DWORD)sizeof(style)) > 0){
         std::string s(style);
         for (auto& c : s) c = (char)tolower((unsigned char)c);
         if (s == "bar"){
-            return CreateOverlayBar(logger);
+            return CreateOverlayBar();
         } else if (s == "vignette"){
-            return CreateOverlayVignette(logger);
+            return CreateOverlayVignette();
         }
     }
-    return CreateOverlayClassic(logger);
+    return CreateOverlayClassic();
 }
 
 }

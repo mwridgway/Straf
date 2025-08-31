@@ -1,5 +1,7 @@
 #include "Straf/Audio.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
+#include <fmt/format.h>
 
 #include <windows.h>
 #include <mmdeviceapi.h>
@@ -74,7 +76,7 @@ public:
         targetRate_ = sampleRate;
         targetChannels_ = channels;
         if (targetRate_ <= 0 || targetChannels_ <= 0){
-            LogError("AudioWasapi invalid params (%d Hz, %d ch)", sampleRate, channels);
+            Straf::StrafLog(spdlog::level::err, "AudioWasapi invalid params (" + std::to_string(sampleRate) + " Hz, " + std::to_string(channels) + " ch)");
             return false;
         }
         return true; // Actual device init happens in Start() on the worker thread/APT.
@@ -91,7 +93,7 @@ public:
             ComPtr<IMMDeviceEnumerator> deviceEnumerator;
             HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&deviceEnumerator));
             if (FAILED(hr)) {
-                LogError("MMDeviceEnumerator CoCreateInstance failed: 0x%08X", hr);
+                Straf::StrafLog(spdlog::level::err, "MMDeviceEnumerator CoCreateInstance failed: 0x" + fmt::format("{:08X}", hr));
                 running_ = false; return;
             }
             ComPtr<IMMDevice> device;
@@ -99,7 +101,7 @@ public:
             hr = deviceEnumerator->GetDefaultAudioEndpoint(eCapture, eMultimedia, &device);
             if (FAILED(hr)) hr = deviceEnumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &device);
             if (FAILED(hr)) {
-                LogError("GetDefaultAudioEndpoint failed: 0x%08X", hr);
+                Straf::StrafLog(spdlog::level::err, "GetDefaultAudioEndpoint failed: 0x" + fmt::format("{:08X}", hr));
                 running_ = false; return;
             }
 
@@ -111,14 +113,14 @@ public:
                     PROPVARIANT pv; PropVariantInit(&pv);
                     if (SUCCEEDED(store->GetValue(PKEY_Device_FriendlyName, &pv)) && pv.vt == VT_LPWSTR){
                         auto name = WToUtf8(pv.pwszVal);
-                        LogInfo("WASAPI endpoint: %s", name.c_str());
+                        Straf::StrafLog(spdlog::level::info, "WASAPI endpoint: " + name);
                     }
                     PropVariantClear(&pv);
                 } else {
                     LPWSTR id = nullptr;
                     if (SUCCEEDED(device->GetId(&id)) && id){
                         auto sid = WToUtf8(id);
-                        LogInfo("WASAPI endpoint ID: %s", sid.c_str());
+                        Straf::StrafLog(spdlog::level::info, "WASAPI endpoint ID: " + sid);
                         CoTaskMemFree(id);
                     }
                 }
@@ -127,12 +129,12 @@ public:
             // Activate IAudioClient
             ComPtr<IAudioClient> client;
             hr = device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr, &client);
-            if (FAILED(hr)) { LogError("Activate IAudioClient failed: 0x%08X", hr); running_ = false; return; }
+            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "Activate IAudioClient failed: 0x" + fmt::format("{:08X}", hr)); running_ = false; return; }
 
             // Get mix format
             WAVEFORMATEX* mix = nullptr;
             hr = client->GetMixFormat(&mix);
-            if (FAILED(hr) || !mix){ LogError("GetMixFormat failed: 0x%08X", hr); running_ = false; return; }
+            if (FAILED(hr) || !mix){ Straf::StrafLog(spdlog::level::err, "GetMixFormat failed: 0x" + fmt::format("{:08X}", hr)); running_ = false; return; }
 
             const int inRate = static_cast<int>(mix->nSamplesPerSec);
             const int inChannels = static_cast<int>(mix->nChannels);
@@ -146,34 +148,33 @@ public:
                                      AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
                                      dur, 0, mix, nullptr);
             if (FAILED(hr)) {
-                LogError("IAudioClient Initialize failed: 0x%08X", hr);
+                Straf::StrafLog(spdlog::level::err, "IAudioClient Initialize failed: 0x" + fmt::format("{:08X}", hr));
                 CoTaskMemFree(mix);
                 running_ = false; return;
             }
 
         // Diagnostics: buffer size and mix/output format
         UINT32 bufferFrames = 0; client->GetBufferSize(&bufferFrames);
-        LogInfo("WASAPI mix: %d Hz, %d ch, float=%d; bufferFrames=%u; output: %d Hz, %d ch",
-            inRate, inChannels, isFloat ? 1 : 0, bufferFrames, targetRate_, targetChannels_);
+
 
             // Capture client
             ComPtr<IAudioCaptureClient> capture;
             hr = client->GetService(IID_PPV_ARGS(&capture));
             if (FAILED(hr)) {
-                LogError("GetService(IAudioCaptureClient) failed: 0x%08X", hr);
+                Straf::StrafLog(spdlog::level::err, "GetService(IAudioCaptureClient) failed: 0x" + fmt::format("{:08X}", hr));
                 CoTaskMemFree(mix);
                 running_ = false; return;
             }
 
             // Event handle
             HANDLE hEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-            if (!hEvent){ LogError("CreateEvent failed: %lu", GetLastError()); CoTaskMemFree(mix); running_ = false; return; }
+            if (!hEvent){ Straf::StrafLog(spdlog::level::err, "CreateEvent failed: " + std::to_string(GetLastError())); CoTaskMemFree(mix); running_ = false; return; }
             hr = client->SetEventHandle(hEvent);
-            if (FAILED(hr)) { LogError("SetEventHandle failed: 0x%08X", hr); CloseHandle(hEvent); CoTaskMemFree(mix); running_ = false; return; }
+            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "SetEventHandle failed: 0x" + fmt::format("{:08X}", hr)); CloseHandle(hEvent); CoTaskMemFree(mix); running_ = false; return; }
 
             // Ready to capture
             hr = client->Start();
-            if (FAILED(hr)) { LogError("IAudioClient Start failed: 0x%08X", hr); CloseHandle(hEvent); CoTaskMemFree(mix); running_ = false; return; }
+            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "IAudioClient Start failed: 0x" + fmt::format("{:08X}", hr)); CloseHandle(hEvent); CoTaskMemFree(mix); running_ = false; return; }
 
             // Capture loop
             std::vector<float> out;

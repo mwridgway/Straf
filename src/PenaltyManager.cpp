@@ -1,6 +1,7 @@
 #include "Straf/PenaltyManager.h"
 #include "Straf/Overlay.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
 #include <memory>
 #include <queue>
 #include <unordered_map>
@@ -23,18 +24,18 @@ public:
         
         // Debounce check - prevent penalties too close together
         if (lastStraf_ + debounceDuration_ > now) {
-            LogInfo("Penalty debounced: %s (too soon, last was %.1fs ago)", 
-                reason.c_str(), 
-                std::chrono::duration<double>(now - lastStraf_).count());
+            Straf::StrafLog(spdlog::level::info, "Penalty debounced: " + reason + " (too soon, last was " + std::to_string(std::chrono::duration<double>(now - lastStraf_).count()) + "s ago)");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Debounce - penalty already active");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Current penalty label: " + (queue_.empty() ? "none" : queue_.front().label));
             return;
         }
         
         // Check if we've already penalized this exact phrase recently
         auto phraseIt = recentPhrases_.find(reason);
         if (phraseIt != recentPhrases_.end() && phraseIt->second + phraseCooldown_ > now) {
-            LogInfo("Penalty skipped: '%s' (phrase recently penalized %.1fs ago)", 
-                reason.c_str(),
-                std::chrono::duration<double>(now - phraseIt->second).count());
+            Straf::StrafLog(spdlog::level::info, "Penalty skipped: '" + reason + "' (phrase recently penalized " + std::to_string(std::chrono::duration<double>(now - phraseIt->second).count()) + "s ago)");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Debounce - phrase cooldown active");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Phrase cooldown remaining: " + std::to_string(std::chrono::duration<double>((phraseIt->second + phraseCooldown_) - now).count()) + "s");
             return;
         }
         
@@ -49,14 +50,23 @@ public:
         // Queue penalty if space available
         if ((int)queue_.size() < queueLimit_) {
             queue_.push(Penalty{reason, duration, defaultCooldown_});
-            LogInfo("Penalty applied: '%s' duration=%.1fs (total stars will be %d, queue=%zu)", 
-                reason.c_str(), 
-                std::chrono::duration<double>(duration).count(),
-                GetStarCount(),
-                queue_.size());
+            Straf::StrafLog(spdlog::level::info, "Penalty applied: '" + reason + "' duration=" + std::to_string(std::chrono::duration<double>(duration).count()) + "s (total stars will be " + std::to_string(GetStarCount()) + ", queue=" + std::to_string(queue_.size()) + ")");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Current penalty: " + (queue_.empty() ? "none" : queue_.front().label));
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Queue contents:");
+            std::queue<Penalty> tmpQ = queue_;
+            while (!tmpQ.empty()) {
+                const auto& p = tmpQ.front();
+                Straf::StrafLog(spdlog::level::debug, "PenaltyManager:   - " + p.label + ", duration " + std::to_string(std::chrono::duration<double>(p.duration).count()) + "s");
+                StrafLog(spdlog::level::trace, std::format("PenaltyManager:   - {}, duration {:.1f}s", p.label.c_str(), std::chrono::duration<double>(p.duration).count()));
+                tmpQ.pop();
+            }
             overlay_->UpdateStatus(GetStarCount(), reason);
         } else {
-            LogInfo("Penalty queue full - dropped: '%s'", reason.c_str());
+            Straf::StrafLog(spdlog::level::info, "Penalty queue full - dropped: '" + reason + "'");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Debounce - queue full");
+            StrafLog(spdlog::level::trace, "PenaltyManager: Debounce - queue full");
+            Straf::StrafLog(spdlog::level::debug, "PenaltyManager: Queue size: " + std::to_string(queue_.size()) + ", limit: " + std::to_string(queueLimit_));
+            StrafLog(spdlog::level::trace, std::format("PenaltyManager: Queue size: {}, limit: {}", queue_.size(), queueLimit_));
         }
     }
 
@@ -75,18 +85,18 @@ public:
             if (start_ + current_->duration <= now) {
                 lastEnd_ = now;
                 current_.reset();
-                LogInfo("Penalty ended naturally");
+                Straf::StrafLog(spdlog::level::info, "Penalty ended naturally");
                 
                 int remainingStars = GetStarCount();
                 if (remainingStars > 0) {
                     // Still have queued penalties - keep overlay visible but update status
                     overlay_->UpdateStatus(remainingStars, "");
-                    LogInfo("Penalty ended but {} stars remaining - keeping overlay visible", remainingStars);
+                    Straf::StrafLog(spdlog::level::info, "Penalty ended but " + std::to_string(remainingStars) + " stars remaining - keeping overlay visible");
                 } else {
                     // No more penalties - hide overlay
                     overlay_->Hide();
                     overlay_->UpdateStatus(0, "");
-                    LogInfo("All penalties finished - hiding overlay");
+                    Straf::StrafLog(spdlog::level::info, "All penalties finished - hiding overlay");
                 }
             }
             return;
@@ -98,7 +108,7 @@ public:
             start_ = now;
             overlay_->ShowPenalty(current_->label);
             overlay_->UpdateStatus(GetStarCount(), current_->label);
-            LogInfo("Penalty started from queue: %s (remaining=%zu)", current_->label.c_str(), queue_.size());
+            Straf::StrafLog(spdlog::level::info, "Penalty started from queue: " + current_->label + " (remaining=" + std::to_string(queue_.size()) + ")");
         }
     }
 

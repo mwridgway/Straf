@@ -24,9 +24,9 @@ std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(std::shared_ptr<ILogger> 
 // Bar: alternative style (bottom bar with status)
 std::unique_ptr<IOverlayRenderer> CreateOverlayBar(std::shared_ptr<ILogger> logger = nullptr);
 // Vignette: elegant rounded vignette style
-std::unique_ptr<IOverlayRenderer> CreateOverlayVignette(std::shared_ptr<ILogger> logger = nullptr);
+std::unique_ptr<IOverlayRenderer> CreateOverlayVignette();
 // Default selection based on environment (STRAF_NO_OVERLAY, STRAF_OVERLAY_STYLE)
 // STRAF_OVERLAY_STYLE: "classic" (default), "bar", or "vignette"
-std::unique_ptr<IOverlayRenderer> CreateOverlayStub(std::shared_ptr<ILogger> logger = nullptr);
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
 
 }

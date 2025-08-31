@@ -1,5 +1,6 @@
 #include "Straf/STT.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
 #include <windows.h>
 #include <sapi.h>
 #include <sphelper.h>
@@ -52,7 +53,7 @@ public:
                     int len = WideCharToMultiByte(CP_UTF8, 0, dstr, -1, nullptr, 0, nullptr, nullptr);
                     phrase.resize(len ? len - 1 : 0);
                     if (len > 0) WideCharToMultiByte(CP_UTF8, 0, dstr, -1, phrase.data(), len, nullptr, nullptr);
-                    LogInfo("SAPI phrase: %s", phrase.c_str());
+                    Straf::StrafLog(spdlog::level::info, "SAPI phrase: " + phrase);
                     // Split into tokens
                     std::string token;
                     for (char c : phrase){
@@ -73,18 +74,18 @@ private:
     void Run(){
         CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (FAILED(CoCreateInstance(CLSID_SpSharedRecognizer, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&recognizer_)))){
-            LogError("SAPI: Create recognizer failed"); return; }
-        if (FAILED(recognizer_->CreateRecoContext(&recog_))){ LogError("SAPI: CreateRecoContext failed"); return; }
-        if (FAILED(recog_->SetNotifyCallbackInterface(this, 0, 0))){ LogError("SAPI: SetNotifyCallbackInterface failed"); return; }
+            Straf::StrafLog(spdlog::level::err, "SAPI: Create recognizer failed"); return; }
+        if (FAILED(recognizer_->CreateRecoContext(&recog_))){ Straf::StrafLog(spdlog::level::err, "SAPI: CreateRecoContext failed"); return; }
+        if (FAILED(recog_->SetNotifyCallbackInterface(this, 0, 0))){ Straf::StrafLog(spdlog::level::err, "SAPI: SetNotifyCallbackInterface failed"); return; }
         ULONGLONG interests = SPFEI(SPEI_RECOGNITION);
-        if (FAILED(recog_->SetInterest(interests, interests))){ LogError("SAPI: SetInterest failed"); return; }
-        if (FAILED(recognizer_->SetRecoState(SPRST_ACTIVE_ALWAYS))){ LogError("SAPI: SetRecoState failed"); return; }
+        if (FAILED(recog_->SetInterest(interests, interests))){ Straf::StrafLog(spdlog::level::err, "SAPI: SetInterest failed"); return; }
+        if (FAILED(recognizer_->SetRecoState(SPRST_ACTIVE_ALWAYS))){ Straf::StrafLog(spdlog::level::err, "SAPI: SetRecoState failed"); return; }
         if (FAILED(recog_->SetAudioOptions(SPAO_RETAIN_AUDIO, nullptr, nullptr))){ /* optional */ }
 
         // Use dictation
-        if (FAILED(recog_->CreateGrammar(1, &grammar_))){ LogError("SAPI: CreateGrammar failed"); return; }
-        if (FAILED(grammar_->LoadDictation(nullptr, SPLO_STATIC))){ LogError("SAPI: LoadDictation failed"); return; }
-        if (FAILED(grammar_->SetDictationState(SPRS_ACTIVE))){ LogError("SAPI: Dictation active failed"); return; }
+        if (FAILED(recog_->CreateGrammar(1, &grammar_))){ Straf::StrafLog(spdlog::level::err, "SAPI: CreateGrammar failed"); return; }
+        if (FAILED(grammar_->LoadDictation(nullptr, SPLO_STATIC))){ Straf::StrafLog(spdlog::level::err, "SAPI: LoadDictation failed"); return; }
+        if (FAILED(grammar_->SetDictationState(SPRS_ACTIVE))){ Straf::StrafLog(spdlog::level::err, "SAPI: Dictation active failed"); return; }
 
         // Loop until stopped; notifications drive recognition callback
         while (running_) { Sleep(50); }

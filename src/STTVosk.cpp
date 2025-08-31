@@ -1,6 +1,7 @@
 #include "Straf/STT.h"
 #include "Straf/Audio.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
 
 #include <thread>
 #include <atomic>
@@ -37,21 +38,24 @@ public:
         if (running_) return;
         cb_ = std::move(onToken);
         running_ = true;
-        LogInfo("Vosk: Starting transcriber thread");
+        Straf::StrafLog(spdlog::level::info, "Vosk: Starting transcriber thread");
         worker_ = std::thread([this]{ Run(); });
     }
 
     void Stop() override {
         if (!running_) return;
-        LogInfo("Vosk: Stopping transcriber");
+        Straf::StrafLog(spdlog::level::info, "Vosk: Stopping transcriber");
         running_ = false;
         if (worker_.joinable()) worker_.join();
         // Cleanup Vosk
-        if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; LogVerbose("Vosk: Freed recognizer"); }
+        if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; Straf::StrafLog(spdlog::level::debug, "Vosk: Freed recognizer"); }
+    if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; StrafLog(spdlog::level::trace, "Vosk: Freed recognizer"); }
         if (spk_) { vosk_spk_model_free(spk_); spk_ = nullptr; }
-        if (mod_) { vosk_model_free(mod_); mod_ = nullptr; LogVerbose("Vosk: Freed model"); }
-        if (audio_) { audio_->Stop(); audio_.reset(); LogVerbose("Vosk: Stopped audio"); }
-        LogInfo("Vosk: Transcriber stopped");
+        if (mod_) { vosk_model_free(mod_); mod_ = nullptr; Straf::StrafLog(spdlog::level::debug, "Vosk: Freed model"); }
+    if (mod_) { vosk_model_free(mod_); mod_ = nullptr; StrafLog(spdlog::level::trace, "Vosk: Freed model"); }
+        if (audio_) { audio_->Stop(); audio_.reset(); Straf::StrafLog(spdlog::level::debug, "Vosk: Stopped audio"); }
+    if (audio_) { audio_->Stop(); audio_.reset(); StrafLog(spdlog::level::trace, "Vosk: Stopped audio"); }
+        Straf::StrafLog(spdlog::level::info, "Vosk: Transcriber stopped");
     }
 
 private:
@@ -63,9 +67,9 @@ private:
         std::string mpath(pathLen - 1, '\0');
         WideCharToMultiByte(CP_UTF8, 0, modelPath_.c_str(), -1, mpath.data(), pathLen, nullptr, nullptr);
         
-        LogInfo("Vosk: loading model at %s", mpath.c_str());
+        Straf::StrafLog(spdlog::level::info, "Vosk: loading model at " + mpath);
         mod_ = vosk_model_new(mpath.c_str());
-        if (!mod_) { LogError("Vosk: failed to load model at %s", mpath.c_str()); running_ = false; return; }
+        if (!mod_) { Straf::StrafLog(spdlog::level::err, "Vosk: failed to load model at " + mpath); running_ = false; return; }
 
         // Optional grammar constraint
         std::string grammar;
@@ -77,26 +81,30 @@ private:
         //     LogInfo("Vosk: using grammar with %zu words", vocab_.size());
         // } else {
             rec_ = vosk_recognizer_new(mod_, 16000.0f);
-            LogInfo("Vosk: using free dictation (no grammar)");
+            Straf::StrafLog(spdlog::level::info, "Vosk: using free dictation (no grammar)");
         // }
-        if (!rec_) { LogError("Vosk: failed to create recognizer"); running_ = false; return; }
+        if (!rec_) { Straf::StrafLog(spdlog::level::err, "Vosk: failed to create recognizer"); running_ = false; return; }
 
         // Create audio source (prefer WASAPI)
-        LogVerbose("Vosk: Initializing WASAPI audio source");
+        Straf::StrafLog(spdlog::level::debug, "Vosk: Initializing WASAPI audio source");
+    StrafLog(spdlog::level::trace, "Vosk: Initializing WASAPI audio source");
         audio_ = CreateAudioWasapi();
         if (!audio_ || !audio_->Initialize(16000, 1)){
-            LogError("Vosk: audio init failed"); running_ = false; return; }
+            Straf::StrafLog(spdlog::level::err, "Vosk: audio init failed"); running_ = false; return; }
         
-        LogVerbose("Vosk: Audio initialized successfully, sample rate: 16000Hz");
+        Straf::StrafLog(spdlog::level::debug, "Vosk: Audio initialized successfully, sample rate: 16000Hz");
+    StrafLog(spdlog::level::trace, "Vosk: Audio initialized successfully, sample rate: 16000Hz");
 
         // Consume audio and feed recognizer
-        LogVerbose("Vosk: Starting audio capture");
+        Straf::StrafLog(spdlog::level::debug, "Vosk: Starting audio capture");
+    StrafLog(spdlog::level::trace, "Vosk: Starting audio capture");
         audio_->Start([this](const AudioBuffer& buf){ OnAudio(buf); });
 
-        LogVerbose("Vosk: Entering main processing loop");
+        Straf::StrafLog(spdlog::level::debug, "Vosk: Entering main processing loop");
+    StrafLog(spdlog::level::trace, "Vosk: Entering main processing loop");
         while (running_) { std::this_thread::sleep_for(std::chrono::milliseconds(50)); }
         
-        LogInfo("Vosk: Exited main processing loop");
+        Straf::StrafLog(spdlog::level::info, "Vosk: Exited main processing loop");
     }
 
     void OnAudio(const AudioBuffer& buf){
@@ -105,9 +113,9 @@ private:
         // Log first few audio callbacks to confirm flow
         static int audioCallCount = 0;
         if (audioCallCount < 5) {
-            LogVerbose("Vosk: Received audio buffer #%d, size=%zu samples", ++audioCallCount, buf.size());
+            Straf::StrafLog(spdlog::level::debug, "Vosk: Received audio buffer #" + std::to_string(++audioCallCount) + ", size=" + std::to_string(buf.size()) + " samples");
         } else if (audioCallCount == 5) {
-            LogVerbose("Vosk: Audio flow established (suppressing further audio buffer logs)");
+            Straf::StrafLog(spdlog::level::debug, "Vosk: Audio flow established (suppressing further audio buffer logs)");
             ++audioCallCount;
         }
         
@@ -120,7 +128,8 @@ private:
         
         if (vosk_recognizer_accept_waveform(rec_, (const char*)pcm.data(), (int)(pcm.size()*sizeof(int16_t)))){
             const char* j = vosk_recognizer_result(rec_);
-            LogVerbose("Vosk: Got final result: %s", j ? j : "(null)");
+            Straf::StrafLog(spdlog::level::debug, std::string("Vosk: Got final result: ") + (j ? j : "(null)"));
+            StrafLog(spdlog::level::trace, std::format("Vosk: Got final result: {}", j ? j : "(null)"));
             ParseAndEmit(j);
         }
         // Skip partial results - we only want final complete phrases
@@ -130,7 +139,8 @@ private:
         if (!json || !cb_) return;
         
         // Log the raw JSON for debugging
-        LogVerbose("Vosk: Parsing JSON: %s", json);
+        Straf::StrafLog(spdlog::level::debug, std::string("Vosk: Parsing JSON: ") + (json ? json : "(null)"));
+    StrafLog(spdlog::level::trace, std::format("Vosk: Parsing JSON: {}", json));
         
         std::string phrase;
         
@@ -141,18 +151,21 @@ private:
             const char* endQuote = strchr(textField, '"');
             if (endQuote) {
                 phrase = std::string(textField, endQuote);
-                LogVerbose("Vosk: Extracted final result: '%s'", phrase.c_str());
+                Straf::StrafLog(spdlog::level::debug, "Vosk: Extracted final result: '" + phrase + "'");
+                StrafLog(spdlog::level::trace, std::format("Vosk: Extracted final result: '{}'", phrase.c_str()));
             }
         }
         
         // Skip empty results
         if (phrase.empty()) {
-            LogVerbose("Vosk: No text content found or empty result");
+            Straf::StrafLog(spdlog::level::debug, "Vosk: No text content found or empty result");
+            StrafLog(spdlog::level::trace, "Vosk: No text content found or empty result");
             return;
         }
         
         // Send the entire phrase to the callback for detector analysis
-        LogVerbose("Vosk: Emitting phrase: '%s' (confidence: 0.8)", phrase.c_str());
+        Straf::StrafLog(spdlog::level::debug, "Vosk: Emitting phrase: '" + phrase + "' (confidence: 0.8)");
+    StrafLog(spdlog::level::trace, std::format("Vosk: Emitting phrase: '{}' (confidence: 0.8)", phrase.c_str()));
         cb_(phrase, 0.8f);
     }
 

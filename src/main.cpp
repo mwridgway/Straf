@@ -79,9 +79,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     
     RunMainLoop(*components);
     
-    LogInfo("StrafAgent exiting");
-    LoggerFactory::Shutdown(); // Shutdown modern logging system
-    ShutdownLogging();
+    Straf::StrafLog(spdlog::level::info, "StrafAgent exiting");
+    Straf::StrafLogShutdown();
     return 0;
 }
 
@@ -128,14 +127,14 @@ std::unique_ptr<IAudioSource> CreateConfiguredAudioSource() {
     std::unique_ptr<IAudioSource> audio;
     if (_wcsicmp(src.c_str(), L"wasapi") == 0){
         audio = CreateAudioWasapi();
-        LogInfo("Audio source: WASAPI mic");
+    Straf::StrafLog(spdlog::level::info, "Audio source: WASAPI mic");
     } else {
         audio = CreateAudioSilent();
-        LogInfo("Audio source: silent");
+    Straf::StrafLog(spdlog::level::info, "Audio source: silent");
     }
     
     if (!audio->Initialize(16000, 1)){
-        LogError("Audio initialize failed; falling back to silent");
+    Straf::StrafLog(spdlog::level::err, "Audio initialize failed; falling back to silent");
         audio = CreateAudioSilent();
         audio->Initialize(16000, 1);
     }
@@ -157,7 +156,7 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
     //     LogInfo("STT: SAPI");
     // } else if (_wcsicmp(t.c_str(), L"vosk") == 0){
         stt = CreateTranscriberVosk();
-        LogInfo("STT: Vosk");
+    Straf::StrafLog(spdlog::level::info, "STT: Vosk");
     // } else {
     //     stt = CreateTranscriberStub();
     //     LogInfo("STT: stub");
@@ -170,7 +169,7 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
     }
     
     if (!stt->Initialize(sttVocab)){
-        LogError("STT initialize failed; falling back to stub");
+    Straf::StrafLog(spdlog::level::err, "STT initialize failed; falling back to stub");
         stt = CreateTranscriberStub();
         stt->Initialize(sttVocab);
     }
@@ -184,7 +183,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     // Initialize tray first
     components->tray = CreateTray();
     components->tray->Run([]{
-        LogInfo("Tray exit requested, shutting down.");
+    Straf::StrafLog(spdlog::level::info, "Tray exit requested, shutting down.");
         g_shouldExit = true;
     });
     
@@ -194,24 +193,20 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     if (!cfg) return nullptr;
     components->config = std::move(*cfg);
     
-    // Initialize logging
-    InitLogging(components->config.logLevel);
-    
-    // Initialize modern logging system  
-    LogLevel modernLevel = LogLevel::Info; // Default
-    if (components->config.logLevel == "error") modernLevel = LogLevel::Error;
-    else if (components->config.logLevel == "warn") modernLevel = LogLevel::Warn;
-    else if (components->config.logLevel == "info") modernLevel = LogLevel::Info;
-    else if (components->config.logLevel == "debug") modernLevel = LogLevel::Debug;
-    else if (components->config.logLevel == "trace") modernLevel = LogLevel::Trace;
-    
-    auto logger = LoggerFactory::CreateLogger("straf", modernLevel, "logs/straf.log");
-    LogInfo("StrafAgent starting...");
-    
-    // Initialize overlay with logger
-    components->overlay = CreateOverlayStub(logger);
+    // Map config logLevel to spdlog::level
+    spdlog::level::level_enum logLevel = spdlog::level::info;
+    const std::string& lvl = components->config.logLevel;
+    if (lvl == "error") logLevel = spdlog::level::err;
+    else if (lvl == "warn") logLevel = spdlog::level::warn;
+    else if (lvl == "info") logLevel = spdlog::level::info;
+    else if (lvl == "debug") logLevel = spdlog::level::debug;
+    else if (lvl == "trace") logLevel = spdlog::level::trace;
+    StrafLogInit("logs/straf.log", logLevel);
+    StrafLog(spdlog::level::info, "StrafAgent starting...");
+    // Initialize overlay (no logger needed)
+    components->overlay = CreateOverlayStub();
     if (!components->overlay->Initialize()) {
-        LogError("Failed to initialize overlay");
+        StrafLog(spdlog::level::err, "Failed to initialize overlay");
         return nullptr;
     }
     
@@ -226,7 +221,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     // Initialize detector for vocabulary filtering
     components->detector = CreateTextAnalysisDetector();
     if (!components->detector->Initialize(components->config.words)) {
-        LogError("Failed to initialize detector");
+    Straf::StrafLog(spdlog::level::err, "Failed to initialize detector");
         return nullptr;
     }
     
@@ -240,7 +235,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
 void RunMainLoop(AppComponents& components) {
     // Set up detection callback - detector will call this for vocabulary matches
     DetectionCallback onDetect = [&components](const DetectionResult& r){
-        LogInfo("Detected: %s (%.2f)", r.word.c_str(), r.confidence);
+    Straf::StrafLog(spdlog::level::info, "Detected: " + r.word + " (" + std::to_string(r.confidence) + ")");
         components.penalties->Trigger(r.word);
     };
     
@@ -250,7 +245,7 @@ void RunMainLoop(AppComponents& components) {
     // Start STT with detector pipeline - STT passes recognized text to detector for analysis
     components.stt->Start([&components](const std::string& recognizedText, float conf){
         if (!recognizedText.empty()) {
-            LogInfo(("STT recognized: \"" + recognizedText + "\" (confidence: " + std::to_string(conf) + ")").c_str());
+            Straf::StrafLog(spdlog::level::info, "STT recognized: \"" + recognizedText + "\" (confidence: " + std::to_string(conf) + ")");
             components.detector->AnalyzeText(recognizedText, conf);
         }
     });
