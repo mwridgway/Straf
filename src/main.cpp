@@ -1,6 +1,4 @@
 #include "Straf/Config.h"
-
-#include "Straf/ModernLogging.h"
 #include "Straf/Detector.h"
 #include "Straf/Audio.h"
 #include "Straf/Overlay.h"
@@ -22,7 +20,7 @@ namespace Straf {
 static std::atomic<bool> g_shouldExit{false};
 // Forward declarations for factory functions
 std::unique_ptr<IAudioSource> CreateAudioSilent();
-std::unique_ptr<IOverlayRenderer> CreateOverlayStub(std::shared_ptr<Straf::ILogger> logger);
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
 std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);
 std::optional<AppConfig> LoadConfig(const std::string& path);
 
@@ -78,9 +76,6 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     }
     
     RunMainLoop(*components);
-    
-    Straf::StrafLog(spdlog::level::info, "StrafAgent exiting");
-    Straf::StrafLogShutdown();
     return 0;
 }
 
@@ -127,14 +122,11 @@ std::unique_ptr<IAudioSource> CreateConfiguredAudioSource() {
     std::unique_ptr<IAudioSource> audio;
     if (_wcsicmp(src.c_str(), L"wasapi") == 0){
         audio = CreateAudioWasapi();
-    Straf::StrafLog(spdlog::level::info, "Audio source: WASAPI mic");
     } else {
         audio = CreateAudioSilent();
-    Straf::StrafLog(spdlog::level::info, "Audio source: silent");
     }
     
     if (!audio->Initialize(16000, 1)){
-    Straf::StrafLog(spdlog::level::err, "Audio initialize failed; falling back to silent");
         audio = CreateAudioSilent();
         audio->Initialize(16000, 1);
     }
@@ -156,7 +148,6 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
     //     LogInfo("STT: SAPI");
     // } else if (_wcsicmp(t.c_str(), L"vosk") == 0){
         stt = CreateTranscriberVosk();
-    Straf::StrafLog(spdlog::level::info, "STT: Vosk");
     // } else {
     //     stt = CreateTranscriberStub();
     //     LogInfo("STT: stub");
@@ -169,7 +160,6 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
     }
     
     if (!stt->Initialize(sttVocab)){
-    Straf::StrafLog(spdlog::level::err, "STT initialize failed; falling back to stub");
         stt = CreateTranscriberStub();
         stt->Initialize(sttVocab);
     }
@@ -182,10 +172,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     
     // Initialize tray first
     components->tray = CreateTray();
-    components->tray->Run([]{
-    Straf::StrafLog(spdlog::level::info, "Tray exit requested, shutting down.");
-        g_shouldExit = true;
-    });
+    components->tray->Run([]{ g_shouldExit = true; });
     
     // Load configuration
     fs::path cfgPath = GetConfigurationPath();
@@ -193,22 +180,10 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     if (!cfg) return nullptr;
     components->config = std::move(*cfg);
     
-    // Map config logLevel to spdlog::level
-    spdlog::level::level_enum logLevel = spdlog::level::info;
-    const std::string& lvl = components->config.logLevel;
-    if (lvl == "error") logLevel = spdlog::level::err;
-    else if (lvl == "warn") logLevel = spdlog::level::warn;
-    else if (lvl == "info") logLevel = spdlog::level::info;
-    else if (lvl == "debug") logLevel = spdlog::level::debug;
-    else if (lvl == "trace") logLevel = spdlog::level::trace;
-    StrafLogInit("logs/straf.log", logLevel);
-    StrafLog(spdlog::level::info, "StrafAgent starting...");
+    // Logging removed
     // Initialize overlay (no logger needed)
     components->overlay = CreateOverlayStub();
-    if (!components->overlay->Initialize()) {
-        StrafLog(spdlog::level::err, "Failed to initialize overlay");
-        return nullptr;
-    }
+    if (!components->overlay->Initialize()) { return nullptr; }
     
     // Initialize penalty manager
     components->penalties = CreatePenaltyManager(components->overlay.get());
@@ -220,10 +195,7 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     
     // Initialize detector for vocabulary filtering
     components->detector = CreateTextAnalysisDetector();
-    if (!components->detector->Initialize(components->config.words)) {
-    Straf::StrafLog(spdlog::level::err, "Failed to initialize detector");
-        return nullptr;
-    }
+    if (!components->detector->Initialize(components->config.words)) { return nullptr; }
     
     // Initialize audio and STT (no vocabulary filtering in STT - detector will handle it)
     components->audio = CreateConfiguredAudioSource();
@@ -234,20 +206,14 @@ std::unique_ptr<AppComponents> InitializeComponents() {
 
 void RunMainLoop(AppComponents& components) {
     // Set up detection callback - detector will call this for vocabulary matches
-    DetectionCallback onDetect = [&components](const DetectionResult& r){
-    Straf::StrafLog(spdlog::level::info, "Detected: " + r.word + " (" + std::to_string(r.confidence) + ")");
-        components.penalties->Trigger(r.word);
-    };
+    DetectionCallback onDetect = [&components](const DetectionResult& r){ components.penalties->Trigger(r.word); };
     
     // Start detector with detection callback
     components.detector->Start(onDetect);
     
     // Start STT with detector pipeline - STT passes recognized text to detector for analysis
     components.stt->Start([&components](const std::string& recognizedText, float conf){
-        if (!recognizedText.empty()) {
-            Straf::StrafLog(spdlog::level::info, "STT recognized: \"" + recognizedText + "\" (confidence: " + std::to_string(conf) + ")");
-            components.detector->AnalyzeText(recognizedText, conf);
-        }
+        if (!recognizedText.empty()) { components.detector->AnalyzeText(recognizedText, conf); }
     });
     
     // Start audio with no-op callback (STT handles audio internally)

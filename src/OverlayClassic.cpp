@@ -1,8 +1,6 @@
 // D3D11 + DirectComposition overlay (topmost, click-through) with Direct2D/DirectWrite rendering
 #include "Straf/Overlay.h"
 
-#include "Straf/ModernLogging.h"
-#include <fmt/format.h>
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -46,16 +44,12 @@ public:
         HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (SUCCEEDED(hr)) {
             comInitialized_ = true;
-        } else if (hr != RPC_E_CHANGED_MODE) {
-            Straf::StrafLog(spdlog::level::err, "CoInitializeEx failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        } else if (hr != RPC_E_CHANGED_MODE) { return false; }
         
         if (!registerWindowClass()) return false;
         if (!createWindow()) return false;
         if (!initD3D()) return false;
         if (!initComposition()) return false;
-    Straf::StrafLog(spdlog::level::info, "OverlayClassic initialized (D3D11 + DirectComposition)");
         return true;
     }
 
@@ -123,10 +117,7 @@ private:
             WS_POPUP,
             x, y, cx, cy,
             nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
-        if (!hwnd_) {
-            Straf::StrafLog(spdlog::level::err, "Overlay window creation failed: " + std::to_string(GetLastError()));
-            return false;
-        }
+        if (!hwnd_) { return false; }
         // Ensure layered attributes are applied (fully opaque visual, but hit-test transparent)
         SetLayeredWindowAttributes(hwnd_, 0, 255, LWA_ALPHA);
         // Transparency is controlled by DirectComposition alpha; no layered attributes needed.
@@ -144,10 +135,7 @@ private:
             nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
             flags, flIn, ARRAYSIZE(flIn), D3D11_SDK_VERSION,
             &d3dDevice_, &flOut, &d3dCtx_);
-        if (FAILED(hr)) {
-            Straf::StrafLog(spdlog::level::err, "D3D11CreateDevice failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         hr = d3dDevice_.As(&dxgiDevice_);
         if (FAILED(hr)) return false;
         ComPtr<IDXGIAdapter> adapter;
@@ -155,32 +143,20 @@ private:
         if (FAILED(hr)) return false;
         // Prefer creating a fresh Factory2
         hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&dxgiFactory_));
-        if (FAILED(hr)) {
-            Straf::StrafLog(spdlog::level::err, "CreateDXGIFactory2 failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         return true;
     }
 
     bool initComposition(){
         // Create DirectComposition device
         HRESULT hr = DCompositionCreateDevice(dxgiDevice_.Get(), IID_PPV_ARGS(&dcompDevice_));
-        if (FAILED(hr)) {
-            Straf::StrafLog(spdlog::level::err, "DCompositionCreateDevice failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
 
         // DirectComposition visual tree first
         HRESULT hrTgt = dcompDevice_->CreateTargetForHwnd(hwnd_, TRUE, &dcompTarget_);
-        if (FAILED(hrTgt)) {
-            Straf::StrafLog(spdlog::level::err, "CreateTargetForHwnd failed: 0x" + fmt::format("{:08X}", hrTgt));
-            return false;
-        }
+        if (FAILED(hrTgt)) { return false; }
         HRESULT hrVis = dcompDevice_->CreateVisual(&visual_);
-        if (FAILED(hrVis)) {
-            Straf::StrafLog(spdlog::level::err, "CreateVisual failed: 0x" + fmt::format("{:08X}", hrVis));
-            return false;
-        }
+        if (FAILED(hrVis)) { return false; }
 
         // Create swap chain for composition - use reasonable overlay size
         DXGI_SWAP_CHAIN_DESC1 desc{};
@@ -199,37 +175,25 @@ private:
         HRESULT hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
         if (FAILED(hrSc)) {
             // Fallback: try with FLIP_SEQUENTIAL
-            Straf::StrafLog(spdlog::level::info, "FLIP_DISCARD failed, trying FLIP_SEQUENTIAL");
             desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
             hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
             if (FAILED(hrSc)) {
                 // Final fallback: try minimal settings
-                Straf::StrafLog(spdlog::level::info, "FLIP_SEQUENTIAL failed, trying minimal settings");
                 desc.Width = 256;
                 desc.Height = 64;
                 desc.BufferCount = 1;
                 desc.Scaling = DXGI_SCALING_NONE;
                 hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
-                if (FAILED(hrSc)) {
-                    Straf::StrafLog(spdlog::level::err, "CreateSwapChainForComposition failed: 0x" + fmt::format("{:08X}", hrSc));
-                    return false;
-                }
+                if (FAILED(hrSc)) { return false; }
             }
         }
-        Straf::StrafLog(spdlog::level::info, "SwapChainForComposition created successfully");
 
         // Create render target view for back buffer
         ComPtr<ID3D11Texture2D> backBuf;
         hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuf));
-        if (FAILED(hr)) {
-            Straf::StrafLog(spdlog::level::err, "GetBuffer failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         hr = d3dDevice_->CreateRenderTargetView(backBuf.Get(), nullptr, &rtv_);
-        if (FAILED(hr)) {
-            Straf::StrafLog(spdlog::level::err, "CreateRenderTargetView failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
 
         // Initialize Direct2D/DirectWrite for drawing text and shapes
         if (!initD2D(backBuf.Get())) return false;
@@ -238,10 +202,7 @@ private:
         visual_->SetContent(swapChain_.Get());
         dcompTarget_->SetRoot(visual_.Get());
         hr = dcompDevice_->Commit();
-        if (FAILED(hr)) {
-            Straf::StrafLog(spdlog::level::err, "DirectComposition Commit failed: 0x" + fmt::format("{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         return true;
     }
 
@@ -325,13 +286,13 @@ private:
             // opts.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #endif
             hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &opts, &d2dFactory_);
-            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "D2D1CreateFactory failed: 0x" + fmt::format("{:08X}", hr)); return false; }
+            if (FAILED(hr)) { return false; }
         }
 
         // Create DWrite factory
         if (!dwFactory_){
             hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), &dwFactory_);
-            if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "DWriteCreateFactory failed: 0x" + fmt::format("{:08X}", hr)); return false; }
+            if (FAILED(hr)) { return false; }
         }
 
         // Get DXGI device and create D2D device/context
@@ -341,9 +302,9 @@ private:
             if (FAILED(hr)) return false;
         }
         hr = d2dFactory_->CreateDevice(dxgiDeviceLocal.Get(), &d2dDevice_);
-        if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "ID2D1Factory1::CreateDevice failed: 0x" + fmt::format("{:08X}", hr)); return false; }
+        if (FAILED(hr)) { return false; }
         hr = d2dDevice_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx_);
-        if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "ID2D1Device::CreateDeviceContext failed: 0x" + fmt::format("{:08X}", hr)); return false; }
+        if (FAILED(hr)) { return false; }
 
         // Create D2D target bitmap from swap chain back buffer
         ComPtr<IDXGISurface> surface;
@@ -356,7 +317,7 @@ private:
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
             dpiX, dpiY);
         hr = d2dCtx_->CreateBitmapFromDxgiSurface(surface.Get(), &bp, &d2dTarget_);
-        if (FAILED(hr)) { Straf::StrafLog(spdlog::level::err, "CreateBitmapFromDxgiSurface failed: 0x" + fmt::format("{:08X}", hr)); return false; }
+        if (FAILED(hr)) { return false; }
         d2dCtx_->SetTarget(d2dTarget_.Get());
 
         // Create brushes
@@ -378,7 +339,7 @@ private:
                 DWRITE_FONT_STRETCH_NORMAL, 48.0f, L"en-us", &textFormat_);
             if (SUCCEEDED(lastHr)) break;
         }
-        if (FAILED(lastHr)) { Straf::StrafLog(spdlog::level::err, "DWrite CreateTextFormat failed: 0x" + fmt::format("{:08X}", lastHr)); return false; }
+        if (FAILED(lastHr)) { return false; }
         textFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         textFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
 
@@ -451,15 +412,12 @@ public:
     void Hide() override {}
 };
 
-std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(std::shared_ptr<ILogger> logger){
-    // For now, OverlayClassic doesn't use logger - can be added later
-    (void)logger; // Suppress unused parameter warning
+std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(){
     return std::make_unique<OverlayClassic>();
 }
 
 std::unique_ptr<IOverlayRenderer> CreateOverlayStub() {
     if (IsEnvSetA("STRAF_NO_OVERLAY")) {
-        StrafLog(spdlog::level::info, "Using no-op overlay (STRAF_NO_OVERLAY set)");
         return std::make_unique<OverlayNoop>();
     }
     char style[32]{};

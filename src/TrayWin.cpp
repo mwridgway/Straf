@@ -3,7 +3,6 @@
 #include "Straf/resource.h"
 #include <windows.h>
 #include <shellapi.h>
-#include "Straf/ModernLogging.h"
 #include <thread>
 
 namespace Straf {
@@ -55,14 +54,10 @@ private:
         RegisterClassW(&wc);
         
         hwnd_ = CreateWindowW(wc.lpszClassName, L"", 0, 0,0,0,0, HWND_MESSAGE, nullptr, wc.hInstance, this);
-        if (!hwnd_) {
-            Straf::StrafLog(spdlog::level::err, "Tray: Failed to create message window");
-            return;
-        }
+        if (!hwnd_) { return; }
         
         AddIcon();
-        Straf::StrafLog(spdlog::level::debug, "Tray: Starting message loop");
-    StrafLog(spdlog::level::trace, "Tray: Starting message loop");
+        
         
         MSG msg;
         while (running_ && GetMessageW(&msg, nullptr, 0, 0) > 0) {
@@ -70,8 +65,7 @@ private:
             DispatchMessageW(&msg);
         }
         
-        Straf::StrafLog(spdlog::level::debug, "Tray: Exited message loop");
-    StrafLog(spdlog::level::trace, "Tray: Exited message loop");
+        
         RemoveIcon();
     }
     void AddIcon() {
@@ -83,25 +77,15 @@ private:
         
         // Try to load custom icon first, fall back to system icon
         nid_.hIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_STRAF_ICON));
-        if (!nid_.hIcon) {
-            Straf::StrafLog(spdlog::level::debug, "Tray: Custom icon not found, using system icon");
-    StrafLog(spdlog::level::trace, "Tray: Custom icon not found, using system icon");
-            nid_.hIcon = LoadIconW(nullptr, IDI_INFORMATION);
-        } else {
-            Straf::StrafLog(spdlog::level::debug, "Tray: Using custom icon");
-    StrafLog(spdlog::level::trace, "Tray: Using custom icon");
-        }
+        if (!nid_.hIcon) { nid_.hIcon = LoadIconW(nullptr, IDI_INFORMATION); }
         
         wcscpy_s(nid_.szTip, L"StrafAgent");
         Shell_NotifyIconW(NIM_ADD, &nid_);
-        Straf::StrafLog(spdlog::level::debug, "Tray: Added tray icon");
-    StrafLog(spdlog::level::trace, "Tray: Added tray icon");
+        
     }
     void RemoveIcon() {
         if (nid_.hWnd) {
             Shell_NotifyIconW(NIM_DELETE, &nid_);
-            Straf::StrafLog(spdlog::level::debug, "Tray: Removed tray icon");
-    StrafLog(spdlog::level::trace, "Tray: Removed tray icon");
             nid_.hWnd = nullptr;
         }
     }
@@ -112,17 +96,11 @@ private:
         AppendMenuW(menu, MF_STRING, 1, L"Exit");
         SetForegroundWindow(hwnd_);
         
-        Straf::StrafLog(spdlog::level::debug, "Tray: Showing context menu");
-    StrafLog(spdlog::level::trace, "Tray: Showing context menu");
+        
         int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd_, nullptr);
         DestroyMenu(menu);
         
-        if (cmd == 1) {
-            Straf::StrafLog(spdlog::level::info, "Tray: Exit selected from menu");
-            if (onExit_) {
-                onExit_();
-            }
-        }
+        if (cmd == 1) { if (onExit_) { onExit_(); } }
     }
     static LRESULT CALLBACK WndProcThunk(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         TrayWin* self = reinterpret_cast<TrayWin*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
@@ -132,11 +110,8 @@ private:
             return 0;
         }
         if (self && msg == self->WM_TRAY_) {
-            Straf::StrafLog(spdlog::level::debug, "Tray: Received tray message, lParam = " + std::to_string(lParam));
-            StrafLog(spdlog::level::trace, "Tray: Received tray message, lParam = " + std::to_string(lParam));
+            
             if (lParam == WM_RBUTTONUP) {
-                Straf::StrafLog(spdlog::level::debug, "Tray: Right-click detected, showing menu");
-                StrafLog(spdlog::level::trace, "Tray: Right-click detected, showing menu");
                 self->ShowMenu();
             }
             return 0;

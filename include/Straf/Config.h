@@ -20,7 +20,6 @@ struct AppConfig {
     std::vector<std::string> words;
     PenaltyConfig penalty{};
     AudioConfig audio{};
-    std::string logLevel{"info"};
 };
 
 std::optional<AppConfig> LoadConfig(const std::string& path);

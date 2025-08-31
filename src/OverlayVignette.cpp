@@ -1,6 +1,5 @@
 // D3D11 + DirectComposition overlay (topmost, click-through) with Direct2D/DirectWrite rendering - Vignette style
 #include "Straf/Overlay.h"
-#include "Straf/ModernLogging.h"
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -36,7 +35,6 @@ static LRESULT CALLBACK OverlayVignetteWndProc(HWND hWnd, UINT msg, WPARAM wPara
         default:
             return DefWindowProc(hWnd, msg, wParam, lParam);
     }
-    StrafLog(spdlog::level::trace, std::format("OverlayVignetteWndProc: Unhandled message {}", msg));
 }
 
 class OverlayVignette : public IOverlayRenderer {
@@ -47,32 +45,25 @@ public:
         HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         if (SUCCEEDED(hr)) {
             comInitialized_ = true;
-        } else if (hr != RPC_E_CHANGED_MODE) {
-            StrafLog(spdlog::level::err, std::format("CoInitializeEx failed: 0x{:08X}", hr));
-            return false;
-        }
+        } else if (hr != RPC_E_CHANGED_MODE) { return false; }
         if (!registerWindowClass()) return false;
         if (!createWindow()) return false;
         if (!initD3D()) return false;
         if (!initComposition()) return false;
-        StrafLog(spdlog::level::info, "OverlayVignette initialized (D3D11 + DirectComposition)");
         return true;
     }
 
     void ShowPenalty(const std::string& label) override {
-        StrafLog(spdlog::level::info, std::format("ShowPenalty called for '{}'", label));
         {
             std::lock_guard<std::mutex> _lk(stateMutex_);
             label_ = label;
             if (starCount_ <= 0) starCount_ = 1; // ensure at least one
         }
         if (!visible_){
-            StrafLog(spdlog::level::info, "Vignette: Starting overlay visibility and render loop");
             visible_ = true;
             ShowWindow(hwnd_, SW_SHOWNA);
             startRenderLoop();
         } else {
-            StrafLog(spdlog::level::debug, "Overlay already visible, updating label only");
         }
     }
 
@@ -83,25 +74,21 @@ public:
         starCount_ = stars;
         if (!label.empty()) label_ = label;
         if (starsChanged || labelChanged) {
-            StrafLog(spdlog::level::info, std::format("Status updated - stars={}, label='{}'", stars, label_));
         }
         // If we have stars to show but overlay is not visible, make it visible
         if (stars > 0 && !visible_) {
-            StrafLog(spdlog::level::info, std::format("UpdateStatus: Making overlay visible for {} stars", stars));
             visible_ = true;
             ShowWindow(hwnd_, SW_SHOWNA);
             startRenderLoop();
         }
         // If no stars and overlay is visible, hide it
         else if (stars == 0 && visible_) {
-            StrafLog(spdlog::level::info, "UpdateStatus: Hiding overlay (no stars)");
             visible_ = false;
             ShowWindow(hwnd_, SW_HIDE);
         }
     }
 
     void Hide() override {
-        StrafLog(spdlog::level::info, "Hide called - stopping overlay");
         visible_ = false;
         ShowWindow(hwnd_, SW_HIDE);
     }
@@ -140,10 +127,7 @@ private:
             WS_POPUP,
             x, y, cx, cy,
             nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
-        if (!hwnd_) {
-            StrafLog(spdlog::level::err, std::format("Overlay vignette window creation failed: {}", GetLastError()));
-            return false;
-        }
+        if (!hwnd_) { return false; }
         SetLayeredWindowAttributes(hwnd_, 0, 255, LWA_ALPHA);
         return true;
     }
@@ -159,40 +143,24 @@ private:
             nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
             flags, flIn, ARRAYSIZE(flIn), D3D11_SDK_VERSION,
             &d3dDevice_, &flOut, &d3dCtx_);
-        if (FAILED(hr)) {
-            StrafLog(spdlog::level::err, std::format("D3D11CreateDevice failed: 0x{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         hr = d3dDevice_.As(&dxgiDevice_);
         if (FAILED(hr)) return false;
         ComPtr<IDXGIAdapter> adapter;
         hr = dxgiDevice_->GetAdapter(&adapter);
         if (FAILED(hr)) return false;
         hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&dxgiFactory_));
-        if (FAILED(hr)) {
-            StrafLog(spdlog::level::err, std::format("CreateDXGIFactory2 failed: 0x{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         return true;
     }
 
     bool initComposition(){
-        StrafLog(spdlog::level::info, "Initializing DirectComposition for full-screen overlay");
         HRESULT hr = DCompositionCreateDevice(dxgiDevice_.Get(), IID_PPV_ARGS(&dcompDevice_));
-        if (FAILED(hr)) {
-            StrafLog(spdlog::level::err, std::format("Vignette: DCompositionCreateDevice failed: 0x{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         HRESULT hrTgt = dcompDevice_->CreateTargetForHwnd(hwnd_, TRUE, &dcompTarget_);
-        if (FAILED(hrTgt)) {
-            StrafLog(spdlog::level::err, std::format("Vignette: CreateTargetForHwnd failed: 0x{:08X}", hrTgt));
-            return false;
-        }
+        if (FAILED(hrTgt)) { return false; }
         HRESULT hrVis = dcompDevice_->CreateVisual(&visual_);
-        if (FAILED(hrVis)) {
-            StrafLog(spdlog::level::err, std::format("CreateVisual failed: 0x{:08X}", hrVis));
-            return false;
-        }
+        if (FAILED(hrVis)) { return false; }
         int screenCx = GetSystemMetrics(SM_CXSCREEN);
         int screenCy = GetSystemMetrics(SM_CYSCREEN);
         DXGI_SWAP_CHAIN_DESC1 desc{};
@@ -209,34 +177,20 @@ private:
         desc.Flags = 0;
         HRESULT hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
         if (FAILED(hrSc)) {
-            StrafLog(spdlog::level::info, "FLIP_DISCARD failed, trying FLIP_SEQUENTIAL");
             desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
             hrSc = dxgiFactory_->CreateSwapChainForComposition(d3dDevice_.Get(), &desc, nullptr, &swapChain_);
-            if (FAILED(hrSc)) {
-                StrafLog(spdlog::level::err, std::format("CreateSwapChainForComposition failed: 0x{:08X}", hrSc));
-                return false;
-            }
+            if (FAILED(hrSc)) { return false; }
         }
-        StrafLog(spdlog::level::info, std::format("Vignette: Full-screen SwapChainForComposition created successfully ({}x{})", screenCx, screenCy));
         ComPtr<ID3D11Texture2D> backBuf;
         hr = swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuf));
-        if (FAILED(hr)) {
-            StrafLog(spdlog::level::err, std::format("GetBuffer failed: 0x{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         hr = d3dDevice_->CreateRenderTargetView(backBuf.Get(), nullptr, &rtv_);
-        if (FAILED(hr)) {
-            StrafLog(spdlog::level::err, std::format("CreateRenderTargetView failed: 0x{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         if (!initD2D(backBuf.Get())) return false;
         visual_->SetContent(swapChain_.Get());
         dcompTarget_->SetRoot(visual_.Get());
         hr = dcompDevice_->Commit();
-        if (FAILED(hr)) {
-            StrafLog(spdlog::level::err, std::format("DirectComposition Commit failed: 0x{:08X}", hr));
-            return false;
-        }
+        if (FAILED(hr)) { return false; }
         return true;
     }
 
@@ -270,10 +224,8 @@ private:
 
         // Only draw vignette effect if there are penalties (stars > 0)
         if (stars > 0) {
-            StrafLog(spdlog::level::trace, std::format("Vignette: Drawing progressive vignette with {} stars for '{}'", stars, label));
             drawProgressiveVignette(sz, stars);
         } else {
-            StrafLog(spdlog::level::trace, "Vignette: No penalties, clear screen");
         }
 
         // Draw status indicator in top-left corner (always visible)
@@ -281,7 +233,6 @@ private:
 
         HRESULT hr = d2dCtx_->EndDraw();
         if (FAILED(hr)){
-            StrafLog(spdlog::level::err, std::format("Vignette: D2D EndDraw failed: 0x{:08X}, attempting recovery", hr));
             ComPtr<ID3D11Texture2D> backBuf;
             if (SUCCEEDED(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuf)))){
                 initD2D(backBuf.Get());
@@ -301,7 +252,7 @@ private:
         float baseRadius = std::min(sz.width, sz.height) * 0.6f; // Start with 60% of screen
         float vignetteRadius = baseRadius * (1.0f - (intensity * 0.7f)); // Shrinks with more stars
         
-    StrafLog(spdlog::level::trace, std::format("Vignette: Progressive effect - stars={}, intensity={:.2f}, radius={:.1f} (screen={:.0f}x{:.0f})", stars, intensity, vignetteRadius, sz.width, sz.height));
+    
         
         // Create radial gradient from center (transparent) to edges (opaque)
         ComPtr<ID2D1RadialGradientBrush> vignetteBrush;
@@ -324,12 +275,11 @@ private:
                 // Fill entire screen with vignette effect
                 D2D1_RECT_F fullScreen = D2D1::RectF(0, 0, sz.width, sz.height);
                 d2dCtx_->FillRectangle(fullScreen, vignetteBrush.Get());
-                StrafLog(spdlog::level::trace, "Vignette: Primary vignette layer applied successfully");
             } else {
-                StrafLog(spdlog::level::err, std::format("Vignette: Failed to create radial gradient brush: 0x{:08X}", hr));
+                
             }
         } else {
-            StrafLog(spdlog::level::err, std::format("Vignette: Failed to create gradient stop collection: 0x{:08X}", hr));
+            
         }
 
         // Add additional darkening rings for higher penalty levels
@@ -338,7 +288,7 @@ private:
             float innerRadius = vignetteRadius * 0.8f;
             float innerIntensity = (stars - 2) / 3.0f; // 0.33 for 3 stars, 1.0 for 5 stars
             
-            StrafLog(spdlog::level::trace, std::format("Vignette: Adding inner ring - innerRadius={:.1f}, innerIntensity={:.2f}", innerRadius, innerIntensity));
+            
             
             ComPtr<ID2D1RadialGradientBrush> innerVignetteBrush;
             D2D1_GRADIENT_STOP innerStops[2];
@@ -358,12 +308,11 @@ private:
                 if (SUCCEEDED(hr)) {
                     D2D1_RECT_F fullScreen = D2D1::RectF(0, 0, sz.width, sz.height);
                     d2dCtx_->FillRectangle(fullScreen, innerVignetteBrush.Get());
-                    StrafLog(spdlog::level::trace, "Vignette: Inner darkening ring applied successfully");
                 } else {
-                    StrafLog(spdlog::level::err, std::format("Vignette: Failed to create inner gradient brush: 0x{:08X}", hr));
+                    
                 }
             } else {
-                StrafLog(spdlog::level::err, std::format("Vignette: Failed to create inner gradient stops: 0x{:08X}", hr));
+                
             }
         }
     }
@@ -433,11 +382,11 @@ private:
             // opts.debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
 #endif
             hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory1), &opts, &d2dFactory_);
-            if (FAILED(hr)) { StrafLog(spdlog::level::err, std::format("D2D1CreateFactory failed: 0x{:08X}", hr)); return false; }
+            if (FAILED(hr)) { return false; }
         }
         if (!dwFactory_){
             hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), &dwFactory_);
-            if (FAILED(hr)) { StrafLog(spdlog::level::err, std::format("DWriteCreateFactory failed: 0x{:08X}", hr)); return false; }
+            if (FAILED(hr)) { return false; }
         }
         ComPtr<IDXGIDevice> dxgiDeviceLocal = dxgiDevice_;
         if (!dxgiDeviceLocal){
@@ -445,9 +394,9 @@ private:
             if (FAILED(hr)) return false;
         }
         hr = d2dFactory_->CreateDevice(dxgiDeviceLocal.Get(), &d2dDevice_);
-        if (FAILED(hr)) { StrafLog(spdlog::level::err, std::format("ID2D1Factory1::CreateDevice failed: 0x{:08X}", hr)); return false; }
+        if (FAILED(hr)) { return false; }
         hr = d2dDevice_->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dCtx_);
-        if (FAILED(hr)) { StrafLog(spdlog::level::err, std::format("ID2D1Device::CreateDeviceContext failed: 0x{:08X}", hr)); return false; }
+        if (FAILED(hr)) { return false; }
         ComPtr<IDXGISurface> surface;
         hr = backBuffer->QueryInterface(IID_PPV_ARGS(&surface));
         if (FAILED(hr)) return false;
@@ -458,7 +407,7 @@ private:
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
             dpiX, dpiY);
         hr = d2dCtx_->CreateBitmapFromDxgiSurface(surface.Get(), &bp, &d2dTarget_);
-        if (FAILED(hr)) { StrafLog(spdlog::level::err, std::format("CreateBitmapFromDxgiSurface failed: 0x{:08X}", hr)); return false; }
+        if (FAILED(hr)) { return false; }
         d2dCtx_->SetTarget(d2dTarget_.Get());
         D2D1_COLOR_F vignetteCol = D2D1::ColorF(0.1f, 0.05f, 0.2f, 0.75f);
         D2D1_COLOR_F borderCol = D2D1::ColorF(0.5f, 0.3f, 0.7f, 0.8f);
@@ -482,7 +431,7 @@ private:
                 DWRITE_FONT_STRETCH_NORMAL, 42.0f, L"en-us", &textFormat_);
             if (SUCCEEDED(lastHr)) break;
         }
-        if (FAILED(lastHr)) { StrafLog(spdlog::level::err, std::format("DWrite CreateTextFormat failed: 0x{:08X}", lastHr)); return false; }
+        if (FAILED(lastHr)) { return false; }
         textFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         textFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         lastHr = E_FAIL;
@@ -492,7 +441,7 @@ private:
                 DWRITE_FONT_STRETCH_NORMAL, 16.0f, L"en-us", &compactTextFormat_);
             if (SUCCEEDED(lastHr)) break;
         }
-        if (FAILED(lastHr)) { StrafLog(spdlog::level::err, std::format("DWrite CreateTextFormat (compact) failed: 0x{:08X}", lastHr)); return false; }
+        if (FAILED(lastHr)) { return false; }
         compactTextFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
         compactTextFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         return true;

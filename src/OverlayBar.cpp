@@ -1,7 +1,4 @@
 #include "Straf/Overlay.h"
-
-#include "Straf/ModernLogging.h"
-#include <fmt/format.h>
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -31,7 +28,7 @@ class OverlayBarImpl : public IOverlayRenderer {
 public:
     bool Initialize() override {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE){ Straf::StrafLog(spdlog::level::err, "CoInitializeEx failed: 0x" + fmt::format("{:08X}", hr)); return false; }
+        if (FAILED(hr) && hr != RPC_E_CHANGED_MODE){ return false; }
         com_ = true;
         WNDCLASSW wc{}; wc.lpszClassName = L"StrafOverlayBar"; wc.lpfnWndProc = BarWndProc; wc.hInstance = GetModuleHandleW(nullptr);
         if (!RegisterClassW(&wc)) return false;
@@ -43,7 +40,6 @@ public:
         if (!hwnd_) return false;
         if (!initD3D()) return false;
         if (!initComposition()) return false;
-    Straf::StrafLog(spdlog::level::info, "OverlayBar initialized");
         return true;
     }
     void ShowPenalty(const std::string& label) override {
@@ -126,9 +122,8 @@ private:
     ComPtr<IDWriteFactory> dw_; ComPtr<IDWriteTextFormat> fmt_;
 };
 
-std::unique_ptr<IOverlayRenderer> CreateOverlayBar(std::shared_ptr<ILogger> logger){ 
-    // For now, OverlayBar doesn't use logger - can be added later
-    (void)logger; // Suppress unused parameter warning
+std::unique_ptr<IOverlayRenderer> CreateOverlayBar(){ 
+
     return std::make_unique<OverlayBarImpl>(); 
 }
 
