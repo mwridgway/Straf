@@ -3,6 +3,10 @@
 #include <memory>
 
 namespace Straf {
+    class ILogger; // Forward declaration
+}
+
+namespace Straf {
 
 class IOverlayRenderer {
 public:
@@ -16,11 +20,13 @@ public:
 
 // Factory functions for pluggable overlays
 // Classic: existing GTA-like stars banner
-std::unique_ptr<IOverlayRenderer> CreateOverlayClassic();
+std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(std::shared_ptr<ILogger> logger = nullptr);
 // Bar: alternative style (bottom bar with status)
-std::unique_ptr<IOverlayRenderer> CreateOverlayBar();
+std::unique_ptr<IOverlayRenderer> CreateOverlayBar(std::shared_ptr<ILogger> logger = nullptr);
+// Vignette: elegant rounded vignette style
+std::unique_ptr<IOverlayRenderer> CreateOverlayVignette(std::shared_ptr<ILogger> logger = nullptr);
 // Default selection based on environment (STRAF_NO_OVERLAY, STRAF_OVERLAY_STYLE)
-// STRAF_OVERLAY_STYLE: "classic" (default) or "bar"
-std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
+// STRAF_OVERLAY_STYLE: "classic" (default), "bar", or "vignette"
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub(std::shared_ptr<ILogger> logger = nullptr);
 
 }

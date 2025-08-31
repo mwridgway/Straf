@@ -22,6 +22,7 @@ endif()
 # Prefer vcpkg config package when available; otherwise fall back to header include paths.
 if(STRAF_USE_VCPKG)
   find_package(nlohmann_json CONFIG QUIET)
+  find_package(spdlog CONFIG QUIET)
 endif()
 find_path(NLOHMANN_JSON_INCLUDE_DIRS nlohmann/json.hpp)
 find_path(SPDLOG_INCLUDE_DIRS spdlog/spdlog.h PATHS ${CMAKE_SOURCE_DIR}/third_party NO_DEFAULT_PATH)
@@ -31,8 +32,10 @@ add_executable(StrafAgent WIN32
   src/main.cpp
   src/Config.cpp
   src/Logging.cpp
+  src/ModernLogging.cpp
   src/OverlayClassic.cpp
   src/OverlayBar.cpp
+  src/OverlayVignette.cpp
   src/AudioSilent.cpp
   src/STTStub.cpp
   src/STTSapi.cpp
@@ -103,8 +106,14 @@ elseif(NLOHMANN_JSON_INCLUDE_DIRS)
 else()
   message(WARNING "nlohmann_json not found. Place nlohmann/json.hpp in a discoverable include path (e.g., third_party) or enable vcpkg.")
 endif()
-if(SPDLOG_INCLUDE_DIRS)
+
+# spdlog for modern logging
+if(spdlog_FOUND)
+  target_link_libraries(StrafAgent PRIVATE spdlog::spdlog)
+elseif(SPDLOG_INCLUDE_DIRS)
   target_include_directories(StrafAgent PRIVATE ${SPDLOG_INCLUDE_DIRS})
+else()
+  message(WARNING "spdlog not found. Install via vcpkg or place in third_party directory.")
 endif()
 
 # Windows libs

@@ -1,0 +1,8 @@
+{
+  "logLevel": "debug",
+  "microphoneDeviceName": "",
+  "overlayType": "vignette",
+  "penaltyDurationSeconds": 5,
+  "vocabulary": ["damn", "shit", "fuck"],
+  "mockTestMode": true
+}

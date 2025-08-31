@@ -13,7 +13,7 @@
         { "name": "STRAF_AUDIO_SOURCE", "value": "wasapi" },
         { "name": "STRAF_VOSK_MODEL", "value": "C:/models/vosk-model-small-en-us-0.15" },
         { "name": "PATH", "value": "C:/tools/vosk;${env:PATH}" },
-        { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
+        { "name": "STRAF_OVERLAY_STYLE", "value": "vignette" }
       ],
       "preLaunchTask": "cmake: build",
       "stopAtEntry": false
@@ -28,7 +28,7 @@
         { "name": "STRAF_USE_SAMPLE_CONFIG", "value": "1" },
         { "name": "STRAF_STT", "value": "sapi" },
         { "name": "STRAF_AUDIO_SOURCE", "value": "wasapi" },
-        { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
+        { "name": "STRAF_OVERLAY_STYLE", "value": "vignette" }
       ],
       "preLaunchTask": "cmake: build",
       "stopAtEntry": false
@@ -43,7 +43,7 @@
         { "name": "STRAF_USE_SAMPLE_CONFIG", "value": "1" },
         { "name": "STRAF_STT", "value": "stub" },
         { "name": "STRAF_AUDIO_SOURCE", "value": "silent" },
-        { "name": "STRAF_OVERLAY_STYLE", "value": "classic" }
+        { "name": "STRAF_OVERLAY_STYLE", "value": "vignette" }
       ],
       "preLaunchTask": "cmake: build",
       "stopAtEntry": false

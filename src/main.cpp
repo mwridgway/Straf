@@ -1,5 +1,6 @@
 #include "Straf/Config.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
 #include "Straf/Detector.h"
 #include "Straf/Audio.h"
 #include "Straf/Overlay.h"
@@ -21,7 +22,7 @@ namespace Straf {
 static std::atomic<bool> g_shouldExit{false};
 // Forward declarations for factory functions
 std::unique_ptr<IAudioSource> CreateAudioSilent();
-std::unique_ptr<IOverlayRenderer> CreateOverlayStub();
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub(std::shared_ptr<Straf::ILogger> logger);
 std::unique_ptr<IPenaltyManager> CreatePenaltyManager(IOverlayRenderer* overlay);
 std::optional<AppConfig> LoadConfig(const std::string& path);
 
@@ -79,6 +80,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
     RunMainLoop(*components);
     
     LogInfo("StrafAgent exiting");
+    LoggerFactory::Shutdown(); // Shutdown modern logging system
     ShutdownLogging();
     return 0;
 }
@@ -194,10 +196,20 @@ std::unique_ptr<AppComponents> InitializeComponents() {
     
     // Initialize logging
     InitLogging(components->config.logLevel);
+    
+    // Initialize modern logging system  
+    LogLevel modernLevel = LogLevel::Info; // Default
+    if (components->config.logLevel == "error") modernLevel = LogLevel::Error;
+    else if (components->config.logLevel == "warn") modernLevel = LogLevel::Warn;
+    else if (components->config.logLevel == "info") modernLevel = LogLevel::Info;
+    else if (components->config.logLevel == "debug") modernLevel = LogLevel::Debug;
+    else if (components->config.logLevel == "trace") modernLevel = LogLevel::Trace;
+    
+    auto logger = LoggerFactory::CreateLogger("straf", modernLevel, "logs/straf.log");
     LogInfo("StrafAgent starting...");
     
-    // Initialize overlay
-    components->overlay = CreateOverlayStub();
+    // Initialize overlay with logger
+    components->overlay = CreateOverlayStub(logger);
     if (!components->overlay->Initialize()) {
         LogError("Failed to initialize overlay");
         return nullptr;
@@ -248,6 +260,14 @@ void RunMainLoop(AppComponents& components) {
     
     // Initialize overlay status
     components.overlay->UpdateStatus(components.penalties->GetStarCount(), "");
+    
+    // // Test mode: Add initial penalties to demonstrate vignette effect progression
+    // LogInfo("Starting vignette test: Adding progressive penalties to demonstrate effect");
+    // for (int i = 0; i < 10; i++) {
+    //     LogInfo("Adding penalty %d/3 for vignette demonstration", i + 1);
+    //     components.penalties->Trigger("test_word");
+    //     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    // }
     
     // Main message loop
     MSG msg{};

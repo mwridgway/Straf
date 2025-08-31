@@ -1,5 +1,6 @@
 #include "Straf/Overlay.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -124,6 +125,10 @@ private:
     ComPtr<IDWriteFactory> dw_; ComPtr<IDWriteTextFormat> fmt_;
 };
 
-std::unique_ptr<IOverlayRenderer> CreateOverlayBar(){ return std::make_unique<OverlayBarImpl>(); }
+std::unique_ptr<IOverlayRenderer> CreateOverlayBar(std::shared_ptr<ILogger> logger){ 
+    // For now, OverlayBar doesn't use logger - can be added later
+    (void)logger; // Suppress unused parameter warning
+    return std::make_unique<OverlayBarImpl>(); 
+}
 
 } // namespace Straf

@@ -1,6 +1,7 @@
 // D3D11 + DirectComposition overlay (topmost, click-through) with Direct2D/DirectWrite rendering
 #include "Straf/Overlay.h"
 #include "Straf/Logging.h"
+#include "Straf/ModernLogging.h"
 #include <windows.h>
 #include <d3d11.h>
 #include <dxgi1_2.h>
@@ -449,11 +450,13 @@ public:
     void Hide() override {}
 };
 
-std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(){
+std::unique_ptr<IOverlayRenderer> CreateOverlayClassic(std::shared_ptr<ILogger> logger){
+    // For now, OverlayClassic doesn't use logger - can be added later
+    (void)logger; // Suppress unused parameter warning
     return std::make_unique<OverlayClassic>();
 }
 
-std::unique_ptr<IOverlayRenderer> CreateOverlayStub(){ 
+std::unique_ptr<IOverlayRenderer> CreateOverlayStub(std::shared_ptr<ILogger> logger){ 
     // Allow disabling overlay completely via env var (useful for tests)
     if (IsEnvSetA("STRAF_NO_OVERLAY")) {
         LogInfo("Using no-op overlay (STRAF_NO_OVERLAY set)");
@@ -465,10 +468,12 @@ std::unique_ptr<IOverlayRenderer> CreateOverlayStub(){
         std::string s(style);
         for (auto& c : s) c = (char)tolower((unsigned char)c);
         if (s == "bar"){
-            return CreateOverlayBar();
+            return CreateOverlayBar(logger);
+        } else if (s == "vignette"){
+            return CreateOverlayVignette(logger);
         }
     }
-    return CreateOverlayClassic();
+    return CreateOverlayClassic(logger);
 }
 
 }

@@ -120,7 +120,7 @@ private:
         
         if (vosk_recognizer_accept_waveform(rec_, (const char*)pcm.data(), (int)(pcm.size()*sizeof(int16_t)))){
             const char* j = vosk_recognizer_result(rec_);
-            LogInfo("Vosk: Got final result: %s", j ? j : "(null)");
+            LogVerbose("Vosk: Got final result: %s", j ? j : "(null)");
             ParseAndEmit(j);
         }
         // Skip partial results - we only want final complete phrases
