@@ -1,5 +1,5 @@
 #include "Straf/STT.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include <windows.h>
 #include <sapi.h>

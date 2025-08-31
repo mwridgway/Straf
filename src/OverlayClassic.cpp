@@ -1,6 +1,6 @@
 // D3D11 + DirectComposition overlay (topmost, click-through) with Direct2D/DirectWrite rendering
 #include "Straf/Overlay.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include <fmt/format.h>
 #include <windows.h>

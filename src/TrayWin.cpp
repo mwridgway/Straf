@@ -1,5 +1,5 @@
 #include "Straf/Tray.h"
-#include "Straf/Logging.h"
+
 #include "Straf/resource.h"
 #include <windows.h>
 #include <shellapi.h>

@@ -1,6 +1,6 @@
 #include "Straf/STT.h"
 #include "Straf/Audio.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 
 #include <thread>
@@ -43,18 +43,47 @@ public:
     }
 
     void Stop() override {
-        if (!running_) return;
+        if (!running_)
+            return;
         Straf::StrafLog(spdlog::level::info, "Vosk: Stopping transcriber");
         running_ = false;
-        if (worker_.joinable()) worker_.join();
+        if (worker_.joinable())
+            worker_.join();
         // Cleanup Vosk
-        if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; Straf::StrafLog(spdlog::level::debug, "Vosk: Freed recognizer"); }
-    if (rec_) { vosk_recognizer_free(rec_); rec_ = nullptr; StrafLog(spdlog::level::trace, "Vosk: Freed recognizer"); }
-        if (spk_) { vosk_spk_model_free(spk_); spk_ = nullptr; }
-        if (mod_) { vosk_model_free(mod_); mod_ = nullptr; Straf::StrafLog(spdlog::level::debug, "Vosk: Freed model"); }
-    if (mod_) { vosk_model_free(mod_); mod_ = nullptr; StrafLog(spdlog::level::trace, "Vosk: Freed model"); }
-        if (audio_) { audio_->Stop(); audio_.reset(); Straf::StrafLog(spdlog::level::debug, "Vosk: Stopped audio"); }
-    if (audio_) { audio_->Stop(); audio_.reset(); StrafLog(spdlog::level::trace, "Vosk: Stopped audio"); }
+        if (rec_) {
+            vosk_recognizer_free(rec_);
+            rec_ = nullptr;
+            Straf::StrafLog(spdlog::level::debug, "Vosk: Freed recognizer");
+        }
+        if (rec_) {
+            vosk_recognizer_free(rec_);
+            rec_ = nullptr;
+            StrafLog(spdlog::level::trace, "Vosk: Freed recognizer");
+        }
+        if (spk_) {
+            vosk_spk_model_free(spk_);
+            spk_ = nullptr;
+        }
+        if (mod_) {
+            vosk_model_free(mod_);
+            mod_ = nullptr;
+            Straf::StrafLog(spdlog::level::debug, "Vosk: Freed model");
+        }
+        if (mod_) {
+            vosk_model_free(mod_);
+            mod_ = nullptr;
+            StrafLog(spdlog::level::trace, "Vosk: Freed model");
+        }
+        if (audio_) {
+            audio_->Stop();
+            audio_.reset();
+            Straf::StrafLog(spdlog::level::debug, "Vosk: Stopped audio");
+        }
+        if (audio_) {
+            audio_->Stop();
+            audio_.reset();
+            StrafLog(spdlog::level::trace, "Vosk: Stopped audio");
+        }
         Straf::StrafLog(spdlog::level::info, "Vosk: Transcriber stopped");
     }
 

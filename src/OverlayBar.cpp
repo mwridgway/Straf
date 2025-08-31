@@ -1,5 +1,5 @@
 #include "Straf/Overlay.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include <fmt/format.h>
 #include <windows.h>

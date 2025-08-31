@@ -1,5 +1,5 @@
 #include "Straf/Config.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include "Straf/Detector.h"
 #include "Straf/Audio.h"

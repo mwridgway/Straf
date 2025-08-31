@@ -1,6 +1,6 @@
 #include "Straf/PenaltyManager.h"
 #include "Straf/Overlay.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include <memory>
 #include <queue>

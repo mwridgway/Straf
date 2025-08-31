@@ -1,5 +1,5 @@
 #include "Straf/Detector.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include <algorithm>
 #include <sstream>

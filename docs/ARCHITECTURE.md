@@ -20,7 +20,7 @@ Key responsibilities:
 ## Code Map
 
 - Config: `include/Straf/Config.h`, `src/Config.cpp`
-- Logging: `include/Straf/Logging.h`, `src/Logging.cpp`
+- Logging: `include/Straf/ModernLogging.h`, `src/ModernLogging.cpp`
 - Audio: `include/Straf/Audio.h`, `src/AudioWasapi.cpp`, `src/AudioSilent.cpp`
 - STT: `include/Straf/STT.h`, `src/STTSapi.cpp`, `src/STTVosk.cpp`
 - Detector: `include/Straf/Detector.h`, `src/DetectorToken.cpp` (token/phrase), `src/DetectorStub.cpp`

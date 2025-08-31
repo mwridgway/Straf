@@ -31,7 +31,6 @@ find_path(SPDLOG_INCLUDE_DIRS spdlog/spdlog.h PATHS ${CMAKE_SOURCE_DIR}/third_pa
 add_executable(StrafAgent WIN32
   src/main.cpp
   src/Config.cpp
-  src/Logging.cpp
   src/ModernLogging.cpp
   src/OverlayClassic.cpp
   src/OverlayBar.cpp

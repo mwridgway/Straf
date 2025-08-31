@@ -1,5 +1,5 @@
 #include "Straf/Detector.h"
-#include "Straf/Logging.h"
+
 #include <windows.h>
 #include <thread>
 #include <atomic>

@@ -1,5 +1,5 @@
 #include "Straf/Audio.h"
-#include "Straf/Logging.h"
+
 #include "Straf/ModernLogging.h"
 #include <fmt/format.h>
 
