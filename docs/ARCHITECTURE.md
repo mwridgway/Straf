@@ -172,11 +172,10 @@ References: `include/Straf/STT.h:1`, `src/STTSapi.cpp:1`, `src/STTVosk.cpp:1`.
 
 ## Build & Flags
 
-- Build with MSVC or via CMake presets; optional vcpkg for `nlohmann-json`.
+- Build with MSVC or via CMake presets.
 - Flags:
   - `STRAF_ENABLE_VOSK=ON` to include Vosk backend
   - `STRAF_ENABLE_CLANG_TIDY=ON` to run static analysis (if available)
-  - `STRAF_USE_VCPKG=ON` to prefer vcpkg packages (default)
   - Runtime env: `STRAF_DETECTOR=token|stub` (default `stub`). When `token`, STT tokens stream into the token/phrase detector with debounce + threshold; otherwise legacy direct matching or stub.
 
 Reference: `CMakeLists.txt:1`.

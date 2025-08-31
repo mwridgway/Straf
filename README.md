@@ -13,13 +13,9 @@ Prerequisites:
 - Windows 11
 - Visual Studio 2022 (Desktop development with C++) or MSVC Build Tools
 - CMake 3.24+
-- Git (only if using vcpkg)
 
 Dependencies:
-- nlohmann-json (header-only) for config parsing.
-	- Recommended (via vcpkg)
-	- Alternate: drop single header `nlohmann/json.hpp` into your include path
-	- Note: The project also has a small built-in fallback parser for basic configs, so it will build without nlohmann-json, but nlohmann-json is preferred.
+- nlohmann-json for config parsing (required)
 
 ### Default build (quick start)
 
@@ -31,48 +27,6 @@ cmake --build build --config Debug
 ```
 
 Artifacts: `build/Debug/StrafAgent.exe`.
-
-### Option A: Build with vcpkg (recommended)
-
-1) Install vcpkg (one time):
-
-```powershell
-# Choose an install folder (example):
-cd $env:USERPROFILE ; git clone https://github.com/microsoft/vcpkg.git ; cd vcpkg
-./bootstrap-vcpkg.bat
-./vcpkg integrate install
-```
-
-2) Install nlohmann-json:
-
-```powershell
-# For 64-bit builds
-./vcpkg install nlohmann-json:x64-windows
-```
-
-3) Configure and build (from repo root):
-
-```powershell
-# Ensure VCPKG_ROOT points to your vcpkg folder if not integrated automatically
-$env:VCPKG_ROOT = "$HOME/vcpkg"
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake
-cmake --build build --config Debug
-```
-
-### Option B: Build without vcpkg
-
-You have two choices:
-- Place `nlohmann/json.hpp` somewhere in your compiler's include path (e.g., `third_party/nlohmann/json.hpp`). The CMake setup will discover it automatically.
-- Do nothing and rely on the project's built-in minimal JSON parser (sufficient for the provided sample config). You can add nlohmann-json later without code changes.
-
-Build commands:
-
-```powershell
-cmake -S . -B build
-cmake --build build --config Debug
-```
-
-Artifacts will be under `build/Debug/StrafAgent.exe` (for Debug config).
 
 ### Build and Run with Vosk STT (Windows)
 

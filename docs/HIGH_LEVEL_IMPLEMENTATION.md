@@ -69,7 +69,7 @@ This document outlines how to implement the app described in `README.md`: listen
 - Fullscreen exclusive apps → documented limitation for MVP.
 
 ## Tech Choices (proposed)
-- Build: CMake, vcpkg (optional) for dependencies.
+- Build: CMake.
 - Audio: WASAPI (IMMDeviceEnumerator, IAudioClient3, IAudioCaptureClient).
 - Rendering: Direct3D11 (future‑proof for effects), compliant with CS2, VAC, and Trusted Mode. No process injection or Present hooks.
 - ASR/KWS: Prefer Vosk (C++) for fully offline; abstract behind `IDetector` interface so we can swap to Microsoft Speech SDK.

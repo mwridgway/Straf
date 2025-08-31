@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.24)
 project(Straf LANGUAGES CXX)
 
 # Options
-option(STRAF_USE_VCPKG "Use vcpkg for dependencies" ON)
 option(STRAF_ENABLE_CLANG_TIDY "Run clang-tidy during builds (if available)" OFF)
 option(STRAF_ENABLE_VOSK "Enable Vosk STT backend" ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -18,12 +17,8 @@ else()
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Optional dependencies (can be enabled via vcpkg or local includes)
-# Prefer vcpkg config package when available; otherwise fall back to header include paths.
-if(STRAF_USE_VCPKG)
-  find_package(nlohmann_json CONFIG QUIET)
-endif()
-find_path(NLOHMANN_JSON_INCLUDE_DIRS nlohmann/json.hpp)
+# Dependencies
+find_package(nlohmann_json CONFIG REQUIRED)
 
 # Sources
 add_executable(StrafAgent WIN32
@@ -93,15 +88,9 @@ if(STRAF_ENABLE_CLANG_TIDY)
   endif()
 endif()
 
-# Includes and optional JSON lib
+# Includes and JSON lib
 target_include_directories(StrafAgent PRIVATE include)
-if(nlohmann_json_FOUND)
-  target_link_libraries(StrafAgent PRIVATE nlohmann_json::nlohmann_json)
-elseif(NLOHMANN_JSON_INCLUDE_DIRS)
-  target_include_directories(StrafAgent PRIVATE ${NLOHMANN_JSON_INCLUDE_DIRS})
-else()
-  message(WARNING "nlohmann_json not found. Place nlohmann/json.hpp in a discoverable include path (e.g., third_party) or enable vcpkg.")
-endif()
+target_link_libraries(StrafAgent PRIVATE nlohmann_json::nlohmann_json)
 
 
 
