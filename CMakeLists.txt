@@ -19,10 +19,12 @@ endif()
 
 # Dependencies
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
 # Sources
 add_executable(StrafAgent WIN32
   src/main.cpp
+  src/logging.cpp
   src/Config.cpp
   src/OverlayClassic.cpp
   src/OverlayBar.cpp
@@ -37,6 +39,9 @@ add_executable(StrafAgent WIN32
   src/DetectorText.cpp
   resources/StrafAgent.rc
 )
+
+target_link_libraries(StrafAgent PRIVATE spdlog::spdlog)
+target_compile_features(StrafAgent PRIVATE cxx_std_20)
 
 # Debugger defaults for Visual Studio: use sample config and stub backends
 set_target_properties(StrafAgent PROPERTIES

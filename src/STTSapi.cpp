@@ -19,14 +19,20 @@ public:
     TranscriberSapi() = default;
     ~TranscriberSapi() override { Stop(); }
 
-    bool Initialize(const std::vector<std::string>& vocab) override {
+    bool Initialize(const std::vector<std::string>& vocab, const std::shared_ptr<spdlog::logger>& logger) override {
+        logger_ = logger;
+        if (logger_) logger_->debug("TranscriberSapi::Initialize with {} vocabulary words", vocab.size());
         vocab_.clear();
         for (auto& w : vocab) vocab_.insert(ToLower(w));
         return true;
     }
 
     void Start(TokenCallback onToken) override {
-       if (running_) return;
+       if (running_) {
+           if (logger_) logger_->debug("TranscriberSapi::Start called but already running");
+           return;
+       }
+        if (logger_) logger_->debug("Starting SAPI transcriber");
         cb_ = std::move(onToken);
         running_ = true;
         worker_ = std::thread([this]{ Run(); });
@@ -100,6 +106,7 @@ private:
         if (!vocab_.empty()){
             if (vocab_.find(tok) == vocab_.end()) return;
         }
+        if (logger_) logger_->debug("SAPI emitting token: '{}'", tok);
         cb_(tok, 0.9f);
     }
 
@@ -110,6 +117,7 @@ private:
     Microsoft::WRL::ComPtr<ISpRecognizer> recognizer_;
     Microsoft::WRL::ComPtr<ISpRecoContext> recog_;
     Microsoft::WRL::ComPtr<ISpRecoGrammar> grammar_;
+    std::shared_ptr<spdlog::logger> logger_;
 };
 
 std::unique_ptr<ITranscriber> CreateTranscriberSapi(){ return std::make_unique<TranscriberSapi>(); }

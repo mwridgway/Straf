@@ -68,9 +68,6 @@ logs/
 /third_party/
 **/CMakeUserPresets.json
 
-# Visual Studio Code
-#.vscode/
-
 # Crash dumps
 *.dmp
 build-vosk/*

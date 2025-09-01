@@ -12,6 +12,8 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
+#include "Straf/logging.h"
+#include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
 
@@ -67,8 +69,20 @@ static fs::path GetAppDataConfigPath(){
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int){
-    using namespace Straf;
     
+    using namespace Straf;
+
+    logsys::init(std::getenv("TEST_VERBOSE") != nullptr);
+    SPDLOG_INFO("Hello from spdlog");
+    SPDLOG_DEBUG("This appears only with verbose or in Debug builds");
+
+    // try {
+    //     throw std::runtime_error("Kaboom");
+    // } catch (const std::exception &e) {
+    //     SPDLOG_ERROR("Caught exception: {}", e.what());
+    //     spdlog::dump_backtrace(); // shows the captured trail
+    // }
+
     auto components = InitializeComponents();
     if (!components) {
         MessageBoxW(nullptr, L"Failed to initialize application", L"Straf", MB_OK | MB_ICONERROR);
@@ -135,6 +149,12 @@ std::unique_ptr<IAudioSource> CreateConfiguredAudioSource() {
 }
 
 std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std::string>& vocabulary) {
+    // Create logger for STT
+    auto logger = spdlog::get("straf");
+    if (!logger) {
+        logger = spdlog::default_logger();
+    }
+
     DWORD need = GetEnvironmentVariableW(L"STRAF_STT", nullptr, 0);
     std::wstring t;
     if (need > 0){ 
@@ -159,9 +179,9 @@ std::unique_ptr<ITranscriber> CreateConfiguredTranscriber(const std::vector<std:
         std::transform(w.begin(), w.end(), w.begin(), [](unsigned char c){ return (char)std::tolower(c); });
     }
     
-    if (!stt->Initialize(sttVocab)){
+    if (!stt->Initialize(sttVocab, logger)){
         stt = CreateTranscriberStub();
-        stt->Initialize(sttVocab);
+        stt->Initialize(sttVocab, logger);
     }
     
     return stt;
